@@ -27,6 +27,8 @@ ANALYSIS_PROMPT = load_skill(__file__, "analysis")
 COPY_PROMPT = load_skill(__file__, "copy")
 PERSONALITY_PROMPT = load_skill(__file__, "personality")
 
+FALLBACK_COPY = "测测你的隐藏人格！#性格测试 #MBTI"
+
 
 # ═══ JSON repair (same logic as generator) ═══
 
@@ -161,6 +163,35 @@ def _gen_personality(dimensions: list, topic: str, llm, ip_info: str = "") -> di
         }
 
 
+def _extract_recommended(raw: str) -> str | None:
+    """从【首推版本】块提取完整文案(契约:文案在块首,直到下一个【标记)。
+
+    返回 None 的情况:无【首推版本】块、文案不足20字、或无话题标签
+    (质量清单要求文案必含3-5个#标签;无标签说明块内容不是文案)。
+    """
+    if "【首推版本】" not in raw:
+        return None
+    rec_block = raw.split("【首推版本】")[-1]
+
+    # 截断到下一个【标记(如【推荐理由】)
+    end = _re.search(r"【[^】]+】", rec_block)
+    if end:
+        rec_block = rec_block[: end.start()]
+
+    lines = [line.strip() for line in rec_block.strip().split("\n") if line.strip()]
+    # 去掉首行版本选择器(如 "B. 好奇心驱动型")
+    if lines and _re.match(
+        r"^[A-F][.、]?\s*(痛点共鸣型|好奇心驱动型|挑战/反直觉型|专业背书型|结果剧透型|社交互动型)$",
+        lines[0],
+    ):
+        lines = lines[1:]
+
+    copy = "\n".join(lines).strip()
+    if len(copy) >= 20 and "#" in copy:
+        return copy
+    return None
+
+
 def _gen_copy(state: dict, llm) -> str:
     prompt = (COPY_PROMPT
         .replace("{title}", state.get("selected_topic", "性格测试"))
@@ -172,27 +203,19 @@ def _gen_copy(state: dict, llm) -> str:
         save_prompt("packager/copy", prompt + "\n\n---\n\n" + resp.content)
         raw = resp.content.strip()
 
-        # Parse multi-variant output: extract 【首推版本】 block
-        # New format: 【A. ...】... 【B. ...】... 【C. ...】... 【首推版本】...
+        # 契约:【首推版本】=完整文案,【推荐理由】=理由(见 skills/copy.md 输出格式)
         if "【首推版本】" in raw:
-            rec_block = raw.split("【首推版本】")[-1].strip()
-            # Take first paragraph as the recommended copy, skip the rationale line
-            lines = rec_block.strip().split("\n")
-            recommended = lines[0].strip()
-            # If first line looks like a rationale/contains "理由", take next non-empty
-            if "理由" in recommended or len(recommended) < 20:
-                for line in lines[1:]:
-                    line = line.strip()
-                    if line and len(line) > 20:
-                        recommended = line
-                        break
-            logger.info("Packager: extracted recommended copy variant")
-            return recommended
+            recommended = _extract_recommended(raw)
+            if recommended:
+                logger.info("Packager: extracted recommended copy variant")
+                return recommended
+            logger.warning("Packager: 首推版本 block invalid (no copy/tags) — using fallback copy")
+            return FALLBACK_COPY
 
         # Fallback: old single-variant format, return as-is
         return raw
     except Exception:
-        return "测测你的隐藏人格！#性格测试 #MBTI"
+        return FALLBACK_COPY
 
 
 # ═══ Main node ═══
