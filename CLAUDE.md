@@ -147,7 +147,7 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 2. **Prompt写死在skill文件**: 决策逻辑是固定规则而非数据驱动的动态策略。后续需根据运营数据迭代。
 3. **Auditor / Reviewer JSON解析不稳定**: DeepSeek有时不遵守output format。已通过`_repair_json`缓解但未根除。Trend Hunter已通过prompt增强改善。
 4. **无真实数据源**: 自有销售=0，竞品价格/销量无法从搜索页获取，Tool返回空或mock。
-5. **Publisher Vercel**: 已修复(shell=True + 1次重试)。偶有输出格式变化需要适配。
+5. **Publisher 部署**: 已切换 GitHub Pages(gh-pages 分支:根=最新版,d/日期/=当天永久版),依赖本机代理在线;Vercel 方案已移除(vercel.app 国内不可达)。
 6. **Packager输出路径bug**: `packager/src/main.py:256` output_dir只回溯3级parent → HTML实际写到 `agents/output/`（日志谎称output/），每次运行重建该目录。详见packager README已知局限。
 7. **所有Agent的MVP临时变更已记录在各README.md中**，含恢复条件。
 

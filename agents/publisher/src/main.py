@@ -1,7 +1,7 @@
 """
-Upload Agent (Publisher) — deploy HTML to Vercel for public URL.
+Upload Agent (Publisher) — deploy HTML to GitHub Pages (gh-pages branch).
 
-V1.0: Vercel CLI (shell=True to find npx in user PATH)
+V1.0: GitHub Pages deploy (gh-pages: root=latest, d/<date>/=permanent)
 V2.0: Xiaohongshu shop integration
 """
 
@@ -11,7 +11,7 @@ from utils.review import save
 
 
 def publisher_node(state: dict) -> dict:
-    """Deploy generated HTML to public URL via Vercel."""
+    """Deploy generated HTML + screenshots to GitHub Pages via gh-pages branch."""
     html_content = state.get("generated_html", "")
     topic = state.get("selected_topic", "test")
     scheduled_time = state.get("scheduled_publish_time")
