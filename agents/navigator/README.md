@@ -48,3 +48,4 @@ DingTalk outgoing webhook 恢复后即可使用：`python bot_server.py` + `ngro
 ## 已知局限
 - 搜索在中国网络下fallback到训练数据（DuckDuckGo被墙），非实时信息
 - IP角色提取依赖LLM训练数据覆盖面，冷门IP可能提取不全
+- **选题池文件缺失**: `main.py:73` 读取 `data/topic_pool.json`，但该文件当前不存在（`POOL_FILE.exists()` 判断失败），70/30轮转实际基于硬编码兜底话题。周一抓取任务（xhs_scraper）成功产出该文件后自动生效。

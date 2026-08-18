@@ -8,5 +8,5 @@
 - ~~ROI计算~~ (无销售数据)
 
 ## 已知局限
-- 成本核算未实现：Token计费回调已写但未接入各Agent的LLM调用。
+- 成本核算方式与职责描述不同：日报成本实际来自 `utils.token_tracker.summary()`（main.py run_once内联调用），而非CallbackHandler方式；`callbacks/token_cost_callback.py` 已写但未接入各Agent的LLM调用。
 - 日报内容较简单，不含成本拆解饼图。

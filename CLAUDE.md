@@ -4,7 +4,7 @@
 
 基于 LangChain + LangGraph 的多智能体自动化系统，每日定时从0到上架全自动运营小红书付费测试题。
 
-**7个核心Agent协作**：数据分析 → 领航员(决策) → 热点嗅探 → 测试题生成 → 包装优化 → 内容审核 → 质量评审 → 上传发布
+**8个核心Agent协作**：数据分析 → 领航员(决策) → 热点嗅探 → 测试题生成 → 包装优化 → 内容审核 → 质量评审 → 上传发布
 
 ## 技术栈
 
@@ -47,12 +47,12 @@ utils/
 
 graph/
   state.py               ← AgentState TypedDict（含review_score/review_verdict）
-  workflow.py            ← 7节点: analyst→navigator→hunter→generator→packager→reviewer→auditor→publisher
+  workflow.py            ← 8节点: analyst→navigator→hunter→generator→packager→reviewer→auditor→publisher
 
 models/                  ← SQLAlchemy ORM (products/orders/strategy_logs/user_profiles)
 scheduler/               ← APScheduler: 每日08:00 workflow + 周一07:00 scraper
 templates/               ← test_template.html (起始页→逐题→结果+深色主题+自动存档)
-data/                    ← 不提交Git：topic_pool.json, xhs_cookies.json
+data/                    ← 不提交Git：xhs_cookies.json, xhs_topics.json, xhs_scraped_data.json, xhs_competitor_products.json（topic_pool.json当前不存在）
 output/                  ← 生成HTML + deploy/目录（Vercel部署用）；archive/存早期快照
 callbacks/               ← LangGraph回调（token_cost_callback.py）
 tests/                   ← 测试目录（目前空壳）
@@ -121,7 +121,7 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 | 任务 | 时间 | 功能 |
 |------|------|------|
 | 每日workflow | 每天 08:00 | 全流程→Vercel部署→钉钉日报(含成本/收益/ROI) |
-| 每周抓取 | 周一 07:00 | 搜XHS"测试题"→更新话题池→存入 `data/topic_pool.json` |
+| 每周抓取 | 周一 07:00 | 搜XHS"测试题"→更新话题池→存入 `data/topic_pool.json`（该文件当前缺失，抓取从未成功产出） |
 
 ## Git 规范
 
@@ -133,7 +133,7 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 
 - **题量**: 固定10题，代码层强制覆盖（`navigator/main.py`）。生产时删除覆盖行。
 - **定价**: ¥0.99-1.99薄利多销，代码层强制覆盖。基于XHS实际竞品观察。
-- **选题**: 代码层从话题池70/30轮转，非LLM决定（避免MBTI偏见）。话题池文件: `data/topic_pool.json`。
+- **选题**: 代码层从话题池70/30轮转，非LLM决定（避免MBTI偏见）。话题池文件: `data/topic_pool.json`（当前不存在，实际走硬编码兜底）。
 - **维度**: 3-12维动态，不写死6维。阴影测试类型不再套用MBTI。
 - **人格标签**: 按选题类型动态决定分类体系（MBTI/shadow_level/trauma_type等）。
 - **审查**: REVIEW_MODE=true → output/NN/（自动保留最近7次）。
@@ -143,12 +143,13 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 
 ## 已知全局问题
 
-1. **选题池需持续更新**: 话题来自每周一抓取+硬编码兜底。exploit模式始终选第一个。
+1. **选题池需持续更新**: 话题来自每周一抓取+硬编码兜底（topic_pool.json当前不存在）。exploit模式始终选第一个。
 2. **Prompt写死在skill文件**: 决策逻辑是固定规则而非数据驱动的动态策略。后续需根据运营数据迭代。
 3. **Auditor / Reviewer JSON解析不稳定**: DeepSeek有时不遵守output format。已通过`_repair_json`缓解但未根除。Trend Hunter已通过prompt增强改善。
 4. **无真实数据源**: 自有销售=0，竞品价格/销量无法从搜索页获取，Tool返回空或mock。
-5. **Publisher Vercel**: 已修复(shell=True)。偶有输出格式变化需要适配。
-6. **所有Agent的MVP临时变更已记录在各README.md中**，含恢复条件。
+5. **Publisher Vercel**: 已修复(shell=True + 1次重试)。偶有输出格式变化需要适配。
+6. **Packager输出路径bug**: `packager/src/main.py:256` output_dir只回溯3级parent → HTML实际写到 `agents/output/`（日志谎称output/），每次运行重建该目录。详见packager README已知局限。
+7. **所有Agent的MVP临时变更已记录在各README.md中**，含恢复条件。
 
 ## 2026-08-10 — Evaluator-Optimizer 闭环 + 外部参考项目
 
@@ -186,6 +187,13 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 - reviewer: 诊断先行+量化检查清单+fixes_needed 输出
 - auditor: 4层审核维度+情绪风险检测
 
+## 2026-08-18 — 目录整理 + git 基线
+
+- **git 基线**: 首次提交 585fd26（71文件）。此前仓库零提交。
+- **归档**: `agents/output/` 的10个 test_*.html → `output/archive/`（这些是packager路径bug的产物，见已知全局问题#6）。
+- **gitignore 修复**: 新增 `output/` 规则（此前与Git规范声明不符）；新增 `github_example/`、`xiaohongshu-ai-workbench-main/` 忽略规则；修复 `data/` 与 `.temp_fix/` 的 .gitkeep keep规则（`/*` 形式，原先父目录整排除导致keep无效）。
+- **文档同步**: 5个agent README（packager路径bug/publisher状态/trend_hunter状态/navigator选题池缺失/monitor成本方式）+ PRD + github_example README 与现状对齐。
+
 ## 当前进度
 
 - [x] 项目初始化、conda环境、目录结构
@@ -199,15 +207,17 @@ xiaohongshu-ai-workbench-main/  ← 外部参考（AI工作台，不提交Git）
 - [x] 定时调度（每日08:00 + 周一07:00抓取）
 - [x] 钉钉日报推送（含Token成本拆解+收益+ROI+亏损警告）
 - [x] Vercel自动部署
-- [x] 选题池动态加载（从 `data/topic_pool.json`）
+- [ ] 选题池动态加载（代码已支持，但 `data/topic_pool.json` 缺失，实际走硬编码兜底）
 - [x] 动态维度（3-12维）+ 动态人格分类（非强制MBTI）
 - [x] Token成本追踪（每个LLM调用精确到0.0001元）
 - [x] **Evaluator-Optimizer 闭环**（reviewer评分<6自动回退generator重做）
 - [x] **Skill全面增强**（7个agent的skill借鉴小红书AI工作台重写）
-- [x] **外部参考项目**（github_example/ 6个项目）
+- [x] **外部参考项目**（github_example/ 6个项目，已gitignore仅本地参考）
 - [x] **Trend Hunter prompt增强**（幻觉防护+格式约束+质量自检，修复JSON解析）
 - [x] **quick_test.py 修复**（Evaluator-Optimizer手动重试+state字段修复）
 - [x] **Publisher 部署重试**（Vercel CLI网络超时自动重试1次）
+- [x] **git 基线提交 + 目录整理**（585fd26、HTML归档、gitignore修复）
+- [x] **README 现状同步**（5个agent README + CLAUDE.md + PRD + github_example README）
 - [ ] Auditor JSON解析稳定化
 - [ ] 小红书上传（待Playwright可用）
 - [ ] 自愈闭环

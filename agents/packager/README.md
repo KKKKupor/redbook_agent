@@ -13,3 +13,6 @@
 ## MVP临时变更
 - 人格映射动态化（非强制MBTI）
 - 所有prompt用`.replace()`
+
+## 已知局限
+- **HTML输出路径bug**: `main.py:256` 的 `output_dir` 只回溯3级parent → 实际写入 `agents/output/`（而非根 `output/`），每次运行都会重建该目录；日志却声称写到 `output/`，与CLAUDE.md描述不符。修复方式：改为4级parent（同文件231行模板路径已是4级）。
