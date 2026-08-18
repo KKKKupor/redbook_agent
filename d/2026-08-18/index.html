@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>人格阴影测试</title>
+<style>
+  :root {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --accent: #4a69bd;
+    --accent-light: #6a89cc;
+    --accent-glass: rgba(74,105,189,0.12);
+    --border: #e5e7eb;
+    --shadow: 0 2px 16px rgba(0,0,0,0.06);
+    --radius: 16px;
+    --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  [data-theme="dark"] {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --text: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --border: #2d2d44;
+    --shadow: 0 2px 16px rgba(0,0,0,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    transition: background var(--transition), color var(--transition);
+    overflow-x: hidden;
+  }
+
+  /* ── Theme toggle ── */
+  #theme-toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 18px; cursor: pointer;
+    box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    transition: all var(--transition);
+  }
+  #theme-toggle:hover { transform: scale(1.08); }
+
+  /* ── Section visibility ── */
+  .section { display: none; }
+  .section.active { display: block; animation: fadeSlideIn 0.5s ease; }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Landing Page ── */
+  #landing {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 100vh; padding: 32px 20px;
+    text-align: center;
+  }
+  #landing .icon { font-size: 64px; margin-bottom: 20px; }
+  #landing h1 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; line-height: 1.3; }
+  #landing .tagline { font-size: 1.05rem; color: var(--text-secondary); max-width: 380px; margin-bottom: 32px; line-height: 1.6; }
+  #landing .meta { display: flex; gap: 24px; margin-bottom: 40px; }
+  #landing .meta-item { text-align: center; }
+  #landing .meta-item .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  #landing .meta-item .label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
+  .btn-start {
+    display: inline-block; padding: 14px 48px;
+    background: var(--accent); color: #fff;
+    font-size: 1.1rem; font-weight: 600;
+    border: none; border-radius: 50px;
+    cursor: pointer;
+    transition: all var(--transition);
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(74,105,189,0.12);
+  }
+  .btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(74,105,189,0.12); }
+
+  /* ── Test Section ── */
+  #test-section { max-width: 600px; margin: 0 auto; padding: 20px; }
+  .progress-wrap { margin-bottom: 32px; }
+  .progress-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+  .progress-bar {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%; background: var(--accent); border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+  .question-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 32px 24px; box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    animation: fadeSlideIn 0.4s ease;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .question-card .q-num { font-size: 0.85rem; color: var(--accent); font-weight: 600; margin-bottom: 16px; }
+  .question-card .q-text { font-size: 1.15rem; line-height: 1.7; margin-bottom: 28px; font-weight: 500; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option-btn {
+    display: block; width: 100%; padding: 16px 20px;
+    background: var(--bg); border: 2px solid var(--border);
+    border-radius: 12px; font-size: 0.95rem; text-align: left;
+    cursor: pointer; font-family: var(--font);
+    transition: all 0.2s ease;
+    color: var(--text);
+  }
+  .option-btn:hover { border-color: var(--accent-light); background: var(--accent-glass); }
+  .option-btn.selected { border-color: var(--accent); background: var(--accent-glass); font-weight: 500; }
+  .nav-btns { display: flex; justify-content: space-between; margin-top: 24px; gap: 12px; }
+  .btn-nav {
+    padding: 12px 28px; border-radius: 50px; font-size: 0.95rem;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: var(--font);
+    transition: all var(--transition);
+  }
+  .btn-nav:hover { border-color: var(--accent); }
+  .btn-nav:disabled { opacity: 0.4; cursor: default; }
+  .btn-nav.primary { background: var(--accent); color: #fff; border: none; }
+
+  /* ── Results Section ── */
+  #results-section { max-width: 640px; margin: 0 auto; padding: 20px; }
+  .result-header { text-align: center; margin-bottom: 32px; }
+  .result-header h1 { font-size: 1.6rem; font-weight: 800; }
+  .result-header .personality-badge {
+    display: inline-block; margin-top: 16px;
+    padding: 10px 28px; background: var(--accent-glass);
+    border: 2px solid var(--accent); border-radius: 50px;
+    font-size: 1.4rem; font-weight: 700; color: var(--accent);
+  }
+  .chart-wrap { max-width: 380px; margin: 0 auto 40px; }
+  .analysis-cards { display: flex; flex-direction: column; gap: 16px; }
+  .analysis-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .analysis-card h3 { font-size: 1rem; margin-bottom: 4px; color: var(--accent); }
+  .analysis-card .score { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+  .analysis-card .detail { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+  .analysis-card .detail strong { color: var(--text); display: block; margin-top: 10px; }
+  .btn-share {
+    display: block; margin: 32px auto; padding: 12px 40px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50px; font-size: 0.95rem; cursor: pointer;
+    font-family: var(--font); color: var(--text);
+    transition: all var(--transition);
+  }
+  .btn-share:hover { border-color: var(--accent); color: var(--accent); }
+  .footer { text-align: center; padding: 24px; font-size: 0.8rem; color: var(--text-secondary); }
+
+  @media (max-width: 480px) {
+    #landing h1 { font-size: 1.5rem; }
+    #landing .meta { gap: 16px; }
+    .question-card { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" onclick="toggleTheme()" title="切换主题">🌓</button>
+
+<!-- ═══ Landing Page ═══ -->
+<div id="landing" class="section active">
+  <div class="icon">🌑🗝️</div>
+  <h1>人格阴影测试</h1>
+  <p class="tagline">你藏起来的那部分自己，一直在替你承受</p>
+  <div class="meta">
+    <div class="meta-item"><div class="num" id="total-questions">60</div><div class="label">道情境题</div></div>
+    <div class="meta-item"><div class="num">6</div><div class="label">维度分析</div></div>
+    <div class="meta-item"><div class="num">~8</div><div class="label">分钟</div></div>
+  </div>
+  <button class="btn-start" id="btn-start-new" onclick="startTest(false)">开始测试</button>
+  <button class="btn-start" id="btn-continue" onclick="startTest(true)" style="display:none;background:var(--surface);color:var(--accent);border:2px solid var(--accent);">继续上次答题</button>
+  <div id="saved-info" style="margin-top:12px;font-size:0.8rem;color:var(--text-secondary);display:none;"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);border:1px solid var(--border);padding:10px 24px;border-radius:50px;font-size:0.85rem;box-shadow:var(--shadow);z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;">已保存</div>
+
+<!-- ═══ Test Section ═══ -->
+<div id="test-section" class="section">
+  <div class="progress-wrap">
+    <div class="progress-info"><span id="progress-label">第 1 题 / 共 60 题</span><span id="progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="question-card" id="question-card">
+    <div class="q-num" id="q-num"></div>
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="q-options"></div>
+  </div>
+  <div class="nav-btns">
+    <button class="btn-nav" id="btn-prev" onclick="prevQuestion()" disabled>← 上一题</button>
+    <button class="btn-nav primary" id="btn-next" onclick="nextQuestion()">下一题 →</button>
+  </div>
+</div>
+
+<!-- ═══ Results Section ═══ -->
+<div id="results-section" class="section">
+  <div class="result-header">
+    <h1>人格阴影测试 — 你的结果</h1>
+    <div class="personality-badge" id="personality-badge">ENFP</div>
+    <p style="margin-top:8px;color:var(--text-secondary);font-size:0.9rem;" id="personality-desc"></p>
+  </div>
+  <div class="chart-wrap"><canvas id="radarChart"></canvas></div>
+  <div class="analysis-cards" id="analysis-cards"></div>
+  <button class="btn-share" onclick="restartTest()">再做一次</button>
+</div>
+
+<div class="footer">仅供娱乐</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // ═══ Data ═══
+  const questions = [{"id": 1, "text": "朋友升职加薪，在朋友圈晒新办公室，你心里？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "真心为他高兴，还留言恭喜", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "有点酸，但马上压下去了", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "C", "text": "凭什么是他，我哪点比他差", "scores": {"D1": 2, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "无感，跟我有什么关系", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 2, "text": "和同事竞争同一个晋升名额，你更在意？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "绝不能输，输了我接受不了", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "全力以赴，但输了也能接受", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "无所谓，谁上都一样", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "如果输了，就找机会让他难堪", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}]}, {"id": 3, "text": "伴侣忘了你的生日，你的第一反应是？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "算了，他太忙了，不怪他", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "心里很不爽，但嘴上不说", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 0, "D5": 1, "D6": 0}}, {"label": "C", "text": "直接发脾气，质问他为什么", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 0, "D5": 0, "D6": 2}}, {"label": "D", "text": "怀疑他是不是根本不在乎我", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 2, "D5": 0, "D6": 0}}]}, {"id": 4, "text": "排队时有人插队到你前面，你会？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "直接拍他肩膀指出插队", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}, {"label": "B", "text": "心里骂他，但不敢出声", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 1}}, {"label": "C", "text": "算了，让他插吧，不差这一会儿", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "故意大声说现在的人真没素质", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}]}, {"id": 5, "text": "在团队中，你通常扮演的角色是？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "出主意的那个人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "默默干活的人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "协调关系的人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "挑毛病找问题的人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 6, "text": "会议上你的方案被同事抢功，你会？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "当场打断，说明这是你的想法", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 1}}, {"label": "B", "text": "事后找他私下沟通", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "忍了，下次不再和他合作", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "D", "text": "记在心里，找机会报复回来", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 2, "D5": 2, "D6": 2}}]}, {"id": 7, "text": "朋友向你炫耀新买的奢侈品包，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "真心夸赞，欣赏她的品味", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "嘴上夸，心里想有什么了不起", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "C", "text": "觉得她在显摆，有点反感", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "希望她能送我一个", "scores": {"D1": 1, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 8, "text": "玩游戏输了，你会？", "type": "stress_response", "content_angle": "stress_response", "options": [{"label": "A", "text": "再来一局，必须赢回来", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "输了就输了，无所谓", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "立刻关掉游戏，不想玩了", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "怪队友太菜，不是我的问题", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}]}, {"id": 9, "text": "新认识的朋友对你特别热情，你？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "很开心，感觉遇到知己", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "怀疑他是不是有所图", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 0}}, {"label": "C", "text": "保持礼貌，但不会交心", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 0}}, {"label": "D", "text": "如果他能帮到我，就多来往", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 10, "text": "当众被指出错误，你的第一反应是？", "type": "stress_response", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "虚心接受，确实是我的问题", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "表面平静，内心很不爽", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "C", "text": "立刻反驳，让他别乱说", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}, {"label": "D", "text": "记住这个人，以后小心他", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 0}}]}, {"id": 11, "text": "伴侣和异性朋友单独吃饭，没告诉你，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "完全信任，没什么好问的", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "心里不舒服，但选择相信他", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 0}}, {"label": "C", "text": "直接问他为什么不告诉我", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 1}}, {"label": "D", "text": "偷偷查他手机，看他有没有隐瞒", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 2, "D6": 0}}]}, {"id": 12, "text": "以下哪种情况让你最难受？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "朋友比我过得好", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "比赛输给实力不如我的人", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "付出很多却得不到回报", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "被人背叛或欺骗", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 0}}]}, {"id": 13, "text": "和陌生人第一次见面，你表现出的自己和真实的自己？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "完全一样，我就是这样的人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "更热情一点，但本质没变", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "C", "text": "会刻意表现得更好相处", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "D", "text": "我有很多面，看心情切换", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}]}, {"id": 14, "text": "如果朋友求你帮忙，但会耗费你很多时间，你？", "type": "decision_style", "content_angle": "decision_style", "options": [{"label": "A", "text": "直接答应，朋友开口不容易", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "看情况，如果有时间就帮", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "让他先帮你做点什么再考虑", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "委婉拒绝，不想耽误自己时间", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 15, "text": "回想过去，你最遗憾的是什么？", "type": "self_assessment", "content_angle": "retrospective", "options": [{"label": "A", "text": "没勇气争取自己想要的", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "对别人太好，亏待了自己", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "太容易相信人，被伤过", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 0}}, {"label": "D", "text": "说了不该说的话，伤了人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}]}, {"id": 16, "text": "朋友升职加薪请你吃饭，你举杯时心里最真实的想法是？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "真心为他高兴，他值得", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "有点酸，但替他开心", "scores": {"D1": 1, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "心想：怎么不是我？", "scores": {"D1": 2, "D2": 1, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "D", "text": "他肯定有手段才上去的", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 0}}]}, {"id": 17, "text": "参加聚会，你更愿意做哪种人？", "type": "preference", "content_angle": "self_perception", "options": [{"label": "A", "text": "全场焦点，带动气氛", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "B", "text": "角落观察者，看众生相", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 0, "D6": 0}}, {"label": "C", "text": "谁需要帮助就搭把手", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "提前离场，不想久留", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}]}, {"id": 18, "text": "伴侣忘记你的生日，你的第一反应是？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "直接表达失落，希望他补救", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "表面没事，心里记一笔", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 1, "D5": 2, "D6": 0}}, {"label": "C", "text": "无所谓，我也常忘他的", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "借机大吵一架，翻旧账", "scores": {"D1": 0, "D2": 1, "D3": 2, "D4": 0, "D5": 0, "D6": 2}}]}, {"id": 19, "text": "同事在会议上直接否定你的方案，你会？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "当场反驳，摆数据讲道理", "scores": {"D2": 2, "D6": 2, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}, {"label": "B", "text": "微笑听完，私下再找他聊", "scores": {"D5": 2, "D6": 0, "D2": 0, "D1": 0, "D3": 0, "D4": 1}}, {"label": "C", "text": "怀疑他是不是针对我", "scores": {"D4": 2, "D1": 1, "D2": 0, "D3": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "算了，懒得争，按他的来", "scores": {"D2": 0, "D6": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 1}}]}, {"id": 20, "text": "朋友找你帮忙但语气理所当然，你心里？", "type": "value_judgment", "content_angle": "social_interaction", "options": [{"label": "A", "text": "帮可以，但得让他知道我的好", "scores": {"D3": 1, "D5": 1, "D2": 0, "D1": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "凭什么？我又不欠他的", "scores": {"D3": 0, "D5": 0, "D2": 0, "D1": 0, "D4": 1, "D6": 2}}, {"label": "C", "text": "直接拒绝，教他学会尊重", "scores": {"D6": 2, "D3": 0, "D5": 0, "D2": 1, "D1": 0, "D4": 0}}, {"label": "D", "text": "默默帮忙，不放心上", "scores": {"D3": 0, "D5": 0, "D2": 0, "D1": 0, "D4": 0, "D6": 0}}]}, {"id": 21, "text": "你觉得自己最大的优点是？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "真诚，从不说违心的话", "scores": {"D5": 0, "D1": 0, "D2": 0, "D3": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "识时务，懂得审时度势", "scores": {"D5": 2, "D1": 0, "D2": 0, "D3": 0, "D4": 1, "D6": 0}}, {"label": "C", "text": "大方，乐于分享和付出", "scores": {"D3": 0, "D1": 0, "D2": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "不惹事，但也不怕事", "scores": {"D6": 1, "D2": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}]}, {"id": 22, "text": "和好友同时竞争一个岗位，你希望？", "type": "value", "content_angle": "decision_style", "options": [{"label": "A", "text": "公平竞争，各凭本事", "scores": {"D2": 2, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "主动退出，友情更重要", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "暗暗较劲，一定要赢他", "scores": {"D2": 2, "D1": 2, "D4": 1, "D3": 0, "D5": 1, "D6": 0}}, {"label": "D", "text": "希望他让给我，他机会多", "scores": {"D3": 2, "D2": 1, "D1": 1, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 23, "text": "新认识的朋友对你特别热情，你会？", "type": "preference", "content_angle": "social_interaction", "options": [{"label": "A", "text": "开心接受，同样热情回应", "scores": {"D4": 0, "D5": 0, "D1": 0, "D2": 0, "D3": 1, "D6": 0}}, {"label": "B", "text": "警惕，他为什么对我这么好", "scores": {"D4": 2, "D5": 0, "D1": 0, "D2": 0, "D3": 0, "D6": 0}}, {"label": "C", "text": "礼貌回应，保持距离观察", "scores": {"D4": 1, "D5": 2, "D1": 0, "D2": 0, "D3": 0, "D6": 0}}, {"label": "D", "text": "觉得他有所图，不想深交", "scores": {"D4": 2, "D1": 1, "D5": 0, "D2": 0, "D3": 0, "D6": 0}}]}, {"id": 24, "text": "复盘过去的失败，你更倾向于认为？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "是我还不够努力", "scores": {"D2": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "运气不好，时机不对", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "有人从中作梗", "scores": {"D4": 2, "D1": 1, "D2": 0, "D3": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "能力不行，认了", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 25, "text": "逛街时朋友一直让你等她试衣服，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "耐心等待，给她参考意见", "scores": {"D3": 0, "D2": 0, "D1": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "催她快点，等得不耐烦", "scores": {"D6": 1, "D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}, {"label": "C", "text": "下次不想和她一起逛街了", "scores": {"D3": 1, "D4": 0, "D1": 0, "D2": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "表面说没事，心里翻白眼", "scores": {"D5": 2, "D3": 1, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}]}, {"id": 26, "text": "你发了一条朋友圈，很久没人点赞，你会？", "type": "self_assessment", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "无所谓，发给自己看的", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "有点失落，然后默默删掉", "scores": {"D1": 1, "D5": 1, "D2": 0, "D3": 0, "D4": 0, "D6": 0}}, {"label": "C", "text": "怀疑自己是不是不受欢迎", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 1, "D5": 0, "D6": 0}}, {"label": "D", "text": "截图发小群吐槽没眼光", "scores": {"D1": 1, "D2": 1, "D6": 1, "D3": 0, "D4": 0, "D5": 0}}]}, {"id": 27, "text": "团队合作中，你通常扮演什么角色？", "type": "preference", "content_angle": "self_perception", "options": [{"label": "A", "text": "领头羊，负责拍板方向", "scores": {"D2": 2, "D6": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 1}}, {"label": "B", "text": "协调者，维护团队和谐", "scores": {"D5": 1, "D1": 0, "D2": 0, "D3": 0, "D4": 0, "D6": 0}}, {"label": "C", "text": "执行者，完成任务就好", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "旁观者，看别人怎么做", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 1, "D5": 1, "D6": 0}}]}, {"id": 28, "text": "恋人总在忙工作忽略你，你会？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "体谅他，自己也找事做", "scores": {"D3": 0, "D1": 0, "D2": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "直接表达需要更多陪伴", "scores": {"D3": 2, "D1": 0, "D2": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "怀疑他是不是不爱我了", "scores": {"D4": 2, "D1": 1, "D3": 1, "D2": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "你忙我也忙，看谁先找谁", "scores": {"D2": 2, "D5": 1, "D3": 0, "D1": 0, "D4": 1, "D6": 0}}]}, {"id": 29, "text": "有人当众开你玩笑让你难堪，你？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "当场怼回去，让他下不来台", "scores": {"D6": 2, "D2": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}, {"label": "B", "text": "尴尬笑笑，转移话题", "scores": {"D5": 2, "D6": 0, "D2": 0, "D1": 0, "D3": 0, "D4": 0}}, {"label": "C", "text": "记在心里，找机会报复", "scores": {"D6": 1, "D4": 2, "D2": 1, "D1": 0, "D3": 0, "D5": 0}}, {"label": "D", "text": "觉得他是在嫉妒我", "scores": {"D1": 1, "D4": 1, "D2": 0, "D3": 0, "D5": 0, "D6": 0}}]}, {"id": 30, "text": "如果能隐身一天，你最想做什么？", "type": "self_assessment", "content_angle": "value_judgment", "options": [{"label": "A", "text": "悄悄观察别人怎么看我", "scores": {"D5": 1, "D4": 2, "D1": 0, "D2": 0, "D3": 0, "D6": 0}}, {"label": "B", "text": "做平时不敢做的事", "scores": {"D5": 1, "D2": 1, "D1": 0, "D3": 0, "D4": 0, "D6": 1}}, {"label": "C", "text": "整蛊讨厌的人，出口气", "scores": {"D6": 2, "D2": 1, "D1": 1, "D3": 0, "D4": 0, "D5": 0}}, {"label": "D", "text": "什么都没兴趣，睡觉休息", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 31, "text": "朋友升职加薪在群里报喜，你第一反应是？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "真心为他高兴，点赞祝福", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "嘴上恭喜，心里有点酸", "scores": {"D1": 1, "D2": 1, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "C", "text": "默默潜水，不想回应", "scores": {"D1": 1, "D2": 0, "D3": 0, "D4": 1, "D5": 1, "D6": 0}}, {"label": "D", "text": "立刻想到自己什么时候能升", "scores": {"D1": 2, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 32, "text": "团队游戏中队友失误导致输掉，你会？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "直接指出是谁的问题", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}, {"label": "B", "text": "心里憋火但表面说没事", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 2, "D6": 1}}, {"label": "C", "text": "觉得游戏而已，输了就输了", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "复盘时反复强调自己的贡献", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 1, "D6": 1}}]}, {"id": 33, "text": "新同事能力很强，风头盖过你，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "主动请教，学习对方长处", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "暗地里较劲，想证明自己", "scores": {"D1": 1, "D2": 2, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "C", "text": "表面配合，心里不舒服", "scores": {"D1": 2, "D2": 1, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "D", "text": "无所谓，各干各的", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 34, "text": "伴侣忘记你的生日，你的感受是？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "很失望，觉得不被重视", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 1, "D5": 0, "D6": 0}}, {"label": "B", "text": "主动提醒，告诉对方想要什么", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 0, "D5": 0, "D6": 1}}, {"label": "C", "text": "表面说没关系，心里记一笔", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 2, "D5": 2, "D6": 0}}, {"label": "D", "text": "无所谓，生日没那么重要", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 35, "text": "朋友聚会，你更愿意扮演什么角色？", "type": "preference", "content_angle": "social_interaction", "options": [{"label": "A", "text": "话题主导者，活跃气氛", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "B", "text": "倾听者，偶尔插两句", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "观察者，看大家互动", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 1, "D6": 0}}, {"label": "D", "text": "被照顾者，希望大家关注我", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 36, "text": "有人在背后说你坏话被你知道了，你？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "直接找对方对质", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}, {"label": "B", "text": "不动声色，找机会反击", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 2, "D5": 2, "D6": 2}}, {"label": "C", "text": "假装不知道，但疏远对方", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 1, "D6": 0}}, {"label": "D", "text": "反思自己是不是哪里做得不好", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 37, "text": "竞聘同一个岗位，对手是你好友，你？", "type": "decision_style", "content_angle": "decision_style", "options": [{"label": "A", "text": "全力以赴，公平竞争", "scores": {"D1": 0, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "主动退出，把机会让给朋友", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "犹豫不决，既想赢又怕伤感情", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "D", "text": "希望对方出点小差错", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 0, "D5": 0, "D6": 1}}]}, {"id": 38, "text": "你觉得自己在关系中更像？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "付出型，总为对方着想", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "平衡型，有来有往", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "期待对方多付出一些", "scores": {"D1": 0, "D2": 0, "D3": 2, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "看对方表现再决定", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 1, "D5": 0, "D6": 0}}]}, {"id": 39, "text": "发朋友圈你会？", "type": "preference", "content_angle": "self_perception", "options": [{"label": "A", "text": "想发什么发什么，真实记录", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "精心修饰，展示好的一面", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "C", "text": "分组可见，对不同人设不同人设", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 0}}, {"label": "D", "text": "很少发，觉得没必要", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 40, "text": "有人当众让你难堪，你会？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "当场怼回去，不留情面", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 2}}, {"label": "B", "text": "笑着化解，但记住这次", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 1}}, {"label": "C", "text": "沉默不语，事后难受", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 1, "D6": 0}}, {"label": "D", "text": "觉得对方可能不是故意的", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 41, "text": "伴侣和异性朋友走得近，你？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "完全信任，不过问", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "心里不舒服，但不说", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 0}}, {"label": "C", "text": "会追问，希望对方解释清楚", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 2, "D5": 0, "D6": 1}}, {"label": "D", "text": "要求对方和异性保持距离", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 1, "D5": 0, "D6": 0}}]}, {"id": 42, "text": "你更认同哪种说法？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "人不犯我我不犯人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 1}}, {"label": "B", "text": "忍一时风平浪静", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "先发制人，掌握主动", "scores": {"D1": 0, "D2": 1, "D3": 0, "D4": 1, "D5": 0, "D6": 2}}, {"label": "D", "text": "得饶人处且饶人", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 43, "text": "朋友求你帮忙但你不想帮，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "直接拒绝，说明理由", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 1}}, {"label": "B", "text": "勉强答应，心里不情愿", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "C", "text": "找借口推脱，不想伤感情", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "D", "text": "让对方先帮你一个忙再谈", "scores": {"D1": 0, "D2": 0, "D3": 1, "D4": 0, "D5": 1, "D6": 0}}]}, {"id": 44, "text": "看到别人晒豪宅豪车，你？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "羡慕但觉得和自己没关系", "scores": {"D1": 1, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "心里想凭什么他行我不行", "scores": {"D1": 2, "D2": 2, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "觉得对方可能在炫耀，反感", "scores": {"D1": 1, "D2": 0, "D3": 0, "D4": 1, "D5": 0, "D6": 1}}, {"label": "D", "text": "祝福对方，自己努力就好", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 45, "text": "你觉得自己在社交中展现的是？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "真实的我，内外一致", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "大家喜欢的样子", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "C", "text": "不同场合不同的我", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 2, "D6": 0}}, {"label": "D", "text": "有所保留，不会全盘托出", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 1, "D5": 2, "D6": 0}}]}, {"id": 46, "text": "好友升职加薪晒朋友圈，你第一反应是？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "真心点赞，替ta高兴", "scores": {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "有点酸，但很快过去", "scores": {"D1": 1, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "心里不舒服，默默划走", "scores": {"D1": 2, "D2": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "觉得ta不过是运气好", "scores": {"D1": 2, "D2": 1, "D3": 0, "D4": 1, "D5": 0, "D6": 0}}]}, {"id": 47, "text": "游戏/比赛快输了，你会？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "无所谓，享受过程就好", "scores": {"D2": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "开始认真，想翻盘", "scores": {"D2": 2, "D1": 0, "D3": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "C", "text": "烦躁，想直接退出", "scores": {"D2": 2, "D6": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}, {"label": "D", "text": "怪队友拖后腿", "scores": {"D2": 2, "D4": 1, "D6": 1, "D1": 0, "D3": 0, "D5": 0}}]}, {"id": 48, "text": "伴侣忘记你们的纪念日，你？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "直接表达失落和期待", "scores": {"D5": 0, "D3": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "假装没事，心里记一笔", "scores": {"D5": 2, "D3": 1, "D4": 1, "D1": 0, "D2": 0, "D6": 0}}, {"label": "C", "text": "暗示对方，希望ta自己发现", "scores": {"D5": 1, "D3": 1, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "D", "text": "觉得无所谓，自己也常忘", "scores": {"D3": 0, "D5": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}]}, {"id": 49, "text": "同事的方案被老板表扬，但你觉得一般，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "公开祝贺，私下保留看法", "scores": {"D5": 2, "D2": 0, "D1": 1, "D3": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "当面提出不同意见", "scores": {"D2": 1, "D6": 2, "D5": 0, "D1": 0, "D3": 0, "D4": 0}}, {"label": "C", "text": "心里不服，想做得更好", "scores": {"D2": 2, "D1": 1, "D5": 0, "D3": 0, "D4": 0, "D6": 0}}, {"label": "D", "text": "觉得和自己没关系", "scores": {"D2": 0, "D1": 0, "D5": 0, "D3": 0, "D4": 0, "D6": 0}}]}, {"id": 50, "text": "朋友总让你帮忙却很少回报，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "依然乐意，帮人不求回报", "scores": {"D3": 0, "D4": 0, "D1": 0, "D2": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "开始减少帮忙，保持距离", "scores": {"D4": 2, "D3": 0, "D5": 1, "D1": 0, "D2": 0, "D6": 0}}, {"label": "C", "text": "心里不满但嘴上不说", "scores": {"D5": 2, "D3": 1, "D4": 1, "D1": 0, "D2": 0, "D6": 0}}, {"label": "D", "text": "直接告诉对方你的感受", "scores": {"D6": 1, "D5": 0, "D3": 0, "D4": 0, "D1": 0, "D2": 0}}]}, {"id": 51, "text": "陌生人无意踩了你一脚，你？", "type": "situational", "content_angle": "stress_response", "options": [{"label": "A", "text": "微笑说没关系", "scores": {"D6": 0, "D5": 1, "D1": 0, "D2": 0, "D3": 0, "D4": 0}}, {"label": "B", "text": "瞪对方一眼，不说话", "scores": {"D6": 2, "D5": 1, "D4": 1, "D1": 0, "D2": 0, "D3": 0}}, {"label": "C", "text": "抱怨几句，表达不满", "scores": {"D6": 2, "D5": 0, "D4": 1, "D1": 0, "D2": 0, "D3": 0}}, {"label": "D", "text": "完全不在意，继续走", "scores": {"D6": 0, "D5": 0, "D4": 0, "D1": 0, "D2": 0, "D3": 0}}]}, {"id": 52, "text": "另一半和异性聊天频繁，你？", "type": "situational", "content_angle": "emotional_pattern", "options": [{"label": "A", "text": "完全信任，不过问", "scores": {"D4": 0, "D1": 0, "D3": 0, "D2": 0, "D5": 0, "D6": 0}}, {"label": "B", "text": "心里不舒服但假装大度", "scores": {"D5": 2, "D4": 1, "D1": 1, "D3": 0, "D2": 0, "D6": 0}}, {"label": "C", "text": "直接表达你的介意", "scores": {"D1": 1, "D4": 1, "D6": 1, "D5": 0, "D2": 0, "D3": 0}}, {"label": "D", "text": "偷偷查看对方手机", "scores": {"D4": 2, "D5": 2, "D1": 1, "D2": 0, "D3": 0, "D6": 0}}]}, {"id": 53, "text": "和伴侣吵架时，你通常？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "冷静沟通，就事论事", "scores": {"D6": 0, "D5": 0, "D3": 0, "D1": 0, "D2": 0, "D4": 0}}, {"label": "B", "text": "说狠话刺痛对方", "scores": {"D6": 2, "D5": 1, "D2": 1, "D1": 0, "D3": 0, "D4": 0}}, {"label": "C", "text": "沉默冷战，等对方先低头", "scores": {"D5": 2, "D2": 1, "D3": 1, "D4": 1, "D1": 0, "D6": 0}}, {"label": "D", "text": "主动道歉，快速和好", "scores": {"D2": 0, "D6": 0, "D3": 0, "D1": 0, "D4": 0, "D5": 0}}]}, {"id": 54, "text": "朋友圈发照片，你更在意？", "type": "preference", "content_angle": "self_perception", "options": [{"label": "A", "text": "记录真实生活就好", "scores": {"D5": 0, "D1": 0, "D2": 0, "D3": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "必须精修到完美才发", "scores": {"D5": 2, "D1": 1, "D2": 1, "D3": 0, "D4": 0, "D6": 0}}, {"label": "C", "text": "在意点赞数，会反复看", "scores": {"D5": 1, "D1": 1, "D2": 2, "D3": 0, "D4": 0, "D6": 0}}, {"label": "D", "text": "很少发，不喜暴露隐私", "scores": {"D5": 1, "D4": 1, "D1": 0, "D2": 0, "D3": 0, "D6": 0}}]}, {"id": 55, "text": "你觉得自己更像哪种人？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "表里如一，想啥说啥", "scores": {"D5": 0, "D3": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "看人下菜碟，见啥人说啥话", "scores": {"D5": 2, "D4": 1, "D2": 1, "D1": 0, "D3": 0, "D6": 0}}, {"label": "C", "text": "心里有想法但不轻易表露", "scores": {"D5": 1, "D4": 1, "D3": 0, "D1": 0, "D2": 0, "D6": 0}}, {"label": "D", "text": "情绪写在脸上，藏不住", "scores": {"D5": 0, "D6": 1, "D1": 0, "D2": 0, "D3": 0, "D4": 0}}]}, {"id": 56, "text": "你希望伴侣在关系中更多？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "主动关心和照顾你", "scores": {"D3": 2, "D5": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "B", "text": "给彼此独立空间", "scores": {"D3": 0, "D5": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "C", "text": "经常表达爱意和赞美", "scores": {"D3": 1, "D5": 0, "D1": 0, "D2": 0, "D4": 0, "D6": 0}}, {"label": "D", "text": "和你一起规划未来", "scores": {"D3": 0, "D2": 0, "D1": 0, "D4": 0, "D5": 0, "D6": 0}}]}, {"id": 57, "text": "同事在会议上抢了你的功劳，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "当场澄清，维护自己权益", "scores": {"D2": 2, "D6": 2, "D5": 0, "D1": 0, "D3": 0, "D4": 0}}, {"label": "B", "text": "私下找对方沟通", "scores": {"D5": 1, "D2": 1, "D6": 1, "D1": 0, "D3": 0, "D4": 0}}, {"label": "C", "text": "忍了，但心里记仇", "scores": {"D5": 2, "D4": 2, "D2": 1, "D1": 1, "D3": 0, "D6": 0}}, {"label": "D", "text": "觉得无所谓，大家有目共睹", "scores": {"D2": 0, "D4": 0, "D1": 0, "D3": 0, "D5": 0, "D6": 0}}]}, {"id": 58, "text": "如果你有超能力，你更想要？", "type": "value", "content_angle": "value_judgment", "options": [{"label": "A", "text": "读心术，看透别人想法", "scores": {"D4": 2, "D5": 1, "D1": 0, "D2": 0, "D3": 0, "D6": 0}}, {"label": "B", "text": "隐身术，自由出入任何地方", "scores": {"D5": 1, "D4": 1, "D2": 0, "D1": 0, "D3": 0, "D6": 0}}, {"label": "C", "text": "心想事成，想要什么有什么", "scores": {"D3": 2, "D2": 1, "D1": 0, "D4": 0, "D5": 0, "D6": 0}}, {"label": "D", "text": "控制时间，随时重来", "scores": {"D2": 1, "D6": 1, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}]}, {"id": 59, "text": "和一个观点完全不同的人聊天，你？", "type": "situational", "content_angle": "social_interaction", "options": [{"label": "A", "text": "好奇对方为什么这么想", "scores": {"D4": 0, "D6": 0, "D1": 0, "D2": 0, "D3": 0, "D5": 0}}, {"label": "B", "text": "试图说服对方，证明自己", "scores": {"D2": 2, "D6": 1, "D4": 0, "D1": 0, "D3": 0, "D5": 0}}, {"label": "C", "text": "表面点头，心里不认同", "scores": {"D5": 2, "D4": 1, "D2": 0, "D1": 0, "D3": 0, "D6": 0}}, {"label": "D", "text": "直接反驳，不留情面", "scores": {"D6": 2, "D2": 1, "D5": 0, "D1": 0, "D3": 0, "D4": 0}}]}, {"id": 60, "text": "你更愿意做哪种人？", "type": "self_assessment", "content_angle": "self_perception", "options": [{"label": "A", "text": "简单直接，不怕得罪人", "scores": {"D5": 0, "D6": 1, "D4": 0, "D1": 0, "D2": 0, "D3": 0}}, {"label": "B", "text": "八面玲珑，人人喜欢", "scores": {"D5": 2, "D3": 1, "D2": 1, "D1": 0, "D4": 0, "D6": 0}}, {"label": "C", "text": "深藏不露，让人捉摸不透", "scores": {"D5": 2, "D4": 1, "D2": 1, "D1": 0, "D3": 0, "D6": 0}}, {"label": "D", "text": "与世无争，过好自己", "scores": {"D2": 0, "D6": 0, "D1": 0, "D3": 0, "D4": 0, "D5": 0}}]}];
+  const dimensionDefs = [{"id": "D1", "name": "嫉妒感", "description": "当他人拥有你渴望却未拥有的东西时，内心泛起的酸涩与不甘的程度", "high_label": "暗流涌动", "low_label": "心若止水"}, {"id": "D2", "name": "胜负欲", "description": "在竞争情境下被激发的求胜渴望，以及无法接受失败的敏感程度", "high_label": "寸土必争", "low_label": "云淡风轻"}, {"id": "D3", "name": "索取倾向", "description": "在关系中习惯性期待他人付出，而非主动给予的潜意识倾向", "high_label": "习惯被爱", "low_label": "乐于给予"}, {"id": "D4", "name": "猜疑心", "description": "对他人动机和话语的信任程度，以及预设防备立场的倾向", "high_label": "防微杜渐", "low_label": "赤诚相见"}, {"id": "D5", "name": "伪装度", "description": "在不同社交场合戴上面具、隐藏真实情绪和想法的频率", "high_label": "千面演员", "low_label": "始终如一"}, {"id": "D6", "name": "攻击性", "description": "面对冒犯或冲突时，内心升起的反击冲动和言语锋利程度", "high_label": "锋芒毕露", "low_label": "温润如玉"}];
+  const personalityMapping = {"classification_type": "shadow_level", "primary_tag": "高阴影型", "tag_name": "暗影行者", "community_description": "和你一样的暗影行者，在人群中占比约15%，你们通常对自己内心的暗面有着敏锐的感知力，也愿意承认它的存在。你们不是没有嫉妒心或攻击性，而是这些情绪在你们身上格外鲜明——当它们浮现时，你们会清晰地感受到那股能量。这种敏锐不是缺陷，而是一种深度：你们能看透人际间的伪装，也对自己有着近乎苛刻的诚实。你们可能常被误解为冷漠或算计，但事实上，你们只是不愿意粉饰太平。暗影行者的优势在于，你们不会在暗处被自己的影子绊倒——你们知道它在哪里，所以能更有意识地选择何时释放、何时收敛。需要注意的可能是，当你们习惯性地用猜疑或胜负欲来保护自己时，偶尔会推开那些真正想靠近的人。你们的成长方向，是学会让这份对暗面的觉察，成为理解他人的桥梁，而不是隔绝自己的高墙。你不孤单，很多人正和你一样，在学着与自己的影子共舞。", "possible_tags": ["高阴影型", "中阴影型", "低阴影型", "混合型"], "dominant_dim": "D1"};
+  const analysisData = [{"dim_id": "D1", "核心特质": "你像一潭深水，表面平静，底下却暗流涌动。看到同事升职、朋友晒幸福，你嘴上说着‘挺好的’，心里却泛起细密的酸涩。这种嫉妒不是恶意，而是你对自己不够好的隐秘指控。你习惯比较，尤其在熟悉的社群里，怕被落下，又不敢承认。你把这股劲藏得很深，深到连自己都骗过，但它却悄悄消耗着你的能量。", "潜在盲点": "你误以为‘不嫉妒’就是高尚，于是压抑真实感受。可那些没说出口的酸涩，会变成对别人的挑剔、对关系的疏离，甚至半夜反复咀嚼别人的成功。你害怕暴露脆弱，怕被社群看轻，于是用‘无所谓’当盔甲。但这份克制，反而让你离真实更远——你既没真正祝福别人，也没真正放过自己。", "专属建议": "试着把嫉妒当成雷达，它指向你真正渴望的方向。下次心口发紧时，写下‘我羡慕他哪一点’，然后问自己‘我能为自己做点什么’。在信任的社群里，找一个人说出你的酸涩，你会发现对方也有同款。把比较换成学习，把暗涌变成行动力。心若止水不是无感，而是看清自己后，依然愿意为自己鼓掌。"}, {"dim_id": "D2", "核心特质": "你像自带雷达的猎手，牌局里每张未出的K、群聊中每条未回的@、赛道上每次0.1秒的差距，都会瞬间点燃你的专注。你享受把模糊规则变成清晰战场的快感，哪怕只是抢到会议室最后一杯咖啡，也能在心底升起微小胜利的旗帜。这份寸土必争的敏锐，让伙伴觉得你可靠，也让对手不敢轻慢——你天然是团队里那个守住底线、推动目标的人。", "潜在盲点": "你的云淡风轻有时是盔甲，但低分端更可能是害怕暴露渴望后的失落。当你在游戏里故意放水、在讨论中沉默退让，表面洒脱，内心却可能悄悄记账。这种‘不争’容易让伙伴误读为不在乎，反而稀释了你的存在感。更危险的是，你偶尔把‘输赢’等同于‘被爱’，于是回避竞争，却错过了并肩作战时那种热腾腾的归属感。", "专属建议": "试着把胜负欲从‘结果’挪到‘过程’：下次团建玩桌游，主动喊出‘我要认真赢’，然后笑着接受输局。你会发现，真正让人靠近的，不是永远云淡风轻，而是你愿意为在乎的事脸红心跳。每周留一次‘小赌注’——比如跟朋友打赌谁先完成报告，输的人请奶茶。这能训练你安全地释放渴望，也让伙伴看见你鲜活的一面，反而更敢与你交心。"}, {"dim_id": "D3", "核心特质": "你像一株被精心浇灌的植物，习惯性地接收阳光与水分，在亲密关系里默认他人应主动付出关怀。你擅长用柔软的姿态吸引照顾者，聚会时总有人为你留座、递茶、记得你的忌口。你并非自私，而是将‘被爱’内化为呼吸般的自然节奏，甚至察觉不到自己正悄然把索取当作爱的证明。这种模式让你在群体中如鱼得水，却也让你的幸福感依赖外界的持续供给，仿佛情绪的风向标始终握在他人手中。", "潜在盲点": "你很少主动询问‘你需要什么’，因为你的注意力早已习惯性锚定在自己的感受缺口上。当朋友倾诉疲惫时，你可能下意识把话题转回自己的压力，并非冷漠，而是你的情感雷达天然朝向接收端。更隐蔽的是，你常把别人的付出合理化——‘他反正喜欢照顾人’，却忽略对方也可能在等待回应。长此以往，你会陷入‘越索取越空虚’的循环，因为真正的连接需要双向流动，而单向的给予终会枯竭，连社群中的温暖也会逐渐变成你愧疚的底色。", "专属建议": "试着每周做一次‘反向给予实验’：提前观察某位常付出者的需求，比如主动帮同事带咖啡、记住朋友的过敏药，或在群里第一个回应别人的求助。重点不是做大事，而是训练自己把注意力从‘我缺什么’转向‘我能补什么’。当你感到被爱时，刻意停顿三秒，问自己：‘此刻我能回赠什么？哪怕一个拥抱或一句具体的感谢。’你会在给予中意外发现，原来主动付出带来的掌控感与归属感，比被动接收更让人踏实——爱不是填满自己的容器，而是点燃彼此的火把。"}, {"dim_id": "D4", "核心特质": "你像一台高精度雷达，在人群里自动扫描微表情、语气停顿和承诺的缝隙。朋友随口一句“改天约”，你会默默记下时间；伴侣晚归十分钟，你已推演三种可能。这种防微杜渐让你极少被辜负，却也让你在聚会中即便笑着，心底仍留着一块“待验证”的缓冲区。你并非不愿信任，而是相信只有掌握细节，才能守住关系的安全线。", "潜在盲点": "你的“先见之明”常被误读为疏离——当同事分享秘密时，你追问“证据呢”的瞬间，空气会突然安静。过度防御让你把善意也当成待拆的包裹，甚至推开那些真正赤诚的人。你习惯用逻辑拆解情感，却忘了有些真心经不起反复钻孔。最隐蔽的代价是：你躲过了小概率的背叛，却也错过了大概率的热烈拥抱。", "专属建议": "试着每周做一次“信任实验”：对亲近的人，把“真的吗”换成“我相信你”，并忍受那一点不确定带来的痒。当怀疑升起时，先问自己“最坏的结果我能承受吗”，再决定是否启动调查模式。加入一个彼此不设防的小团体（比如读书会或运动队），观察那些“傻气”的坦诚如何换来更深的安全感。你会发现，真正的防微杜渐，是允许裂缝存在，仍选择并肩。"}, {"dim_id": "D5", "核心特质": "你像一面精心打磨的镜子，在不同场合折射出恰到好处的光——同事眼中的可靠搭档，朋友群里的幽默担当，家人面前乖巧懂事。这种切换近乎本能，连你自己都分不清哪张脸更真实。你享受掌控他人期待的成就感，仿佛戴上无数面具后，反而拥有了最安全的藏身之处。在社群中你是公认的‘气氛调节器’，但深夜独处时，你常对着镜中陌生的自己发问：那个被所有人喜欢的‘我’，到底是谁？", "潜在盲点": "你的伪装太精密，以至于连亲密关系都成了表演舞台。当伴侣说‘你变了’时，你第一反应不是反思，而是立刻调整下一幕剧本。长期下来，你开始恐惧卸下面具的瞬间——比如醉酒后的失态、崩溃时的失言，这些‘破绽’让你感到羞耻。你在社群中越是受欢迎，就越害怕被看穿，于是不断加厚伪装，最终陷入‘越被爱越孤独’的循环。你甚至会用‘大家不都这样吗’来麻痹自己的不安，却忽略了内心早已发出的求救信号。", "专属建议": "试着在安全的小社群（比如仅3人的挚友群）里，每周主动暴露一次‘不完美’：抱怨工作、承认嫉妒、拒绝帮忙。你会发现，当你说‘我今天不想装热情’时，真正在意你的人反而松了口气。把‘伪装度’从生存技能降级为社交调味料——保留基本礼貌，但允许情绪有毛边。记录每次摘下面具后的真实感受，连续21天，你会重新定义‘被喜欢’与‘被接纳’的区别。记住，真正的社群归属感，是有人看过你最狼狈的样子，依然选择坐在你身边。"}, {"dim_id": "D6", "核心特质": "你的攻击性如刀锋出鞘，在辩论中直击要害，在竞争里先声夺人。你不屑迂回，享受观点碰撞的火花，常成为团队里那个敢拍桌子的破局者。这种锋芒让你在压力下反而亢奋，像狼群中的头领，用直接和果敢赢得敬畏。你不需要被喜欢，你需要被看见，而黑暗中的同伴，正因你的锐利而找到方向。", "潜在盲点": "你的锋利常误伤盟友——一句‘你太弱了’可能让协作伙伴暗自退缩。你误以为只有压倒性强势才能证明价值，却忽略了亲密关系需要卸甲时刻。在深夜复盘时，你是否感到孤独？那些被你刺痛的灵魂，渐渐学会绕开你行走。攻击性成了你的铠甲，也成了你的牢笼，让你在证明自己强大的同时，错过了真正柔软的联结。", "专属建议": "尝试把攻击性转化为‘定向突破力’：在会议中先肯定对方再提出异议，把‘你错了’换成‘我有个更险的招’。每周刻意留出两小时，参与非竞技性社群活动（如桌游合作局），练习倾听而不反驳。你会发现，当锋芒对准共同目标而非他人软肋时，你不仅赢得战斗，更赢得并肩的战友——真正的力量，是能收放自如的刀鞘。"}];
+  const STORAGE_KEY = 'xhs_test_' + (personalityMapping.classification_type || 'test') + '_' + questions.length;
+
+  // ═══ State ═══
+  let currentQ = 0;
+  const answers = {};
+  let radarChart = null;
+
+  // ═══ Save/Load ═══
+  function saveProgress() {
+    var data = {
+      answers: answers,
+      currentQ: currentQ,
+      savedAt: new Date().toISOString(),
+      topic: '人格阴影测试',
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      return data;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function clearProgress() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.opacity = '1';
+    setTimeout(function() { t.style.opacity = '0'; }, 1800);
+  }
+
+  // ═══ Theme ═══
+  function toggleTheme() {
+    var html = document.documentElement;
+    var cur = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  }
+
+  // ═══ Navigation ═══
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function startTest(restore) {
+    if (restore) {
+      var saved = loadProgress();
+      if (saved && saved.answers) {
+        Object.assign(answers, saved.answers);
+        currentQ = saved.currentQ || 0;
+      }
+    } else {
+      clearProgress();
+    }
+    showSection('test-section');
+    renderQuestion();
+  }
+
+  function restartTest() {
+    Object.keys(answers).forEach(function(k) { delete answers[k]; });
+    clearProgress();
+    if (radarChart) { radarChart.destroy(); radarChart = null; }
+    currentQ = 0;
+    showSection('landing');
+  }
+
+  // ═══ Question Rendering ═══
+  function renderQuestion() {
+    if (currentQ >= questions.length) {
+      clearProgress();
+      calculateResults();
+      return;
+    }
+    var q = questions[currentQ];
+    document.getElementById('q-num').textContent = '第 ' + (currentQ + 1) + ' 题';
+    document.getElementById('q-text').textContent = q.text;
+
+    var optsDiv = document.getElementById('q-options');
+    optsDiv.innerHTML = '';
+    q.options.forEach(function(opt, idx) {
+      var btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.textContent = opt.label + '. ' + opt.text;
+      if (answers[q.id] === idx) { btn.classList.add('selected'); }
+      btn.onclick = function() {
+        answers[q.id] = idx;
+        optsDiv.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+        saveProgress();
+      };
+      optsDiv.appendChild(btn);
+    });
+
+    var pct = Math.round((currentQ / questions.length) * 100);
+    document.getElementById('progress-label').textContent = '第 ' + (currentQ + 1) + ' 题 / 共 ' + questions.length + ' 题';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-fill').style.width = pct + '%';
+
+    document.getElementById('btn-prev').disabled = (currentQ === 0);
+    var btnNext = document.getElementById('btn-next');
+    btnNext.textContent = (currentQ === questions.length - 1) ? '查看结果 →' : '下一题 →';
+    btnNext.onclick = function() { nextQuestion(); };
+
+    if (currentQ > 0) { saveProgress(); }
+    document.getElementById('question-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function nextQuestion() {
+    var q = questions[currentQ];
+    if (answers[q.id] === undefined) {
+      var card = document.getElementById('question-card');
+      card.style.animation = 'none'; card.offsetHeight; card.style.animation = 'shake 0.4s ease';
+      return;
+    }
+    currentQ++;
+    if (currentQ >= questions.length) {
+      calculateResults();
+    } else {
+      renderQuestion();
+    }
+  }
+
+  function prevQuestion() {
+    if (currentQ > 0) { currentQ--; renderQuestion(); }
+  }
+
+  // ═══ Keyframes ═══
+  var shakeStyle = document.createElement('style');
+  shakeStyle.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}';
+  document.head.appendChild(shakeStyle);
+
+  // ═══ Results ═══
+  function calculateResults() {
+    showSection('results-section');
+
+    // Sum scores
+    var rawScores = {};
+    dimensionDefs.forEach(function(d) { rawScores[d.id] = 0; });
+    questions.forEach(function(q) {
+      var optIdx = answers[q.id];
+      if (optIdx !== undefined && q.options[optIdx] && q.options[optIdx].scores) {
+        var scores = q.options[optIdx].scores;
+        Object.keys(scores).forEach(function(dim) { rawScores[dim] = (rawScores[dim] || 0) + scores[dim]; });
+      }
+    });
+
+    // Normalize 0-100 (dynamic scoring: max = round(100/question_count))
+    var maxPerQ = 2;
+    var maxPossible = questions.length * maxPerQ;
+    var normalized = {};
+    Object.keys(rawScores).forEach(function(dim) {
+      var pct = Math.round((rawScores[dim] / Math.max(1, maxPossible)) * 100);
+      normalized[dim] = Math.min(100, pct);
+    });
+
+    // Radar chart
+    var ctx = document.getElementById('radarChart').getContext('2d');
+    if (radarChart) { radarChart.destroy(); }
+    var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    radarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: dimensionDefs.map(function(d) { return d.name; }),
+        datasets: [{
+          label: '你的得分',
+          data: dimensionDefs.map(function(d) { return normalized[d.id]; }),
+          backgroundColor: accent + '33',
+          borderColor: accent,
+          borderWidth: 2.5,
+          pointBackgroundColor: accent,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          tension: 0.2,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 11 } } } },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // Personality badge — computed from highest dimension score
+    var isMBTI = personalityMapping.classification_type === 'mbti';
+    var tag = personalityMapping.primary_tag || 'N/A';
+
+    if (isMBTI) {
+      // Legacy MBTI: use rules {E: "D1>50", N: "D2>50", ...}
+      var rules = personalityMapping.rules || {};
+      var parts = [];
+      if (rules.E) { var m = rules.E.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'E' : 'I'); }
+      if (rules.N) { var m = rules.N.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'N' : 'S'); }
+      if (rules.T) { var m = rules.T.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'T' : 'F'); }
+      if (rules.J) { var m = rules.J.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'J' : 'P'); }
+      tag = parts.length >= 4 ? parts.join('') : tag;
+    } else {
+      // Non-MBTI: find the user's ACTUAL highest-scoring dimension, use corresponding tag
+      var possibleTags = personalityMapping.possible_tags || [];
+      var dominantDim = personalityMapping.dominant_dim || '';
+
+      // Find which dimension has the highest normalized score
+      var bestDim = dominantDim;
+      var bestScore = -1;
+      dimensionDefs.forEach(function(d) {
+        var s = normalized[d.id] || 0;
+        if (s > bestScore) { bestScore = s; bestDim = d.id; }
+      });
+
+      if (possibleTags.length > 0 && bestDim) {
+        // Map by index: D1→tag[0], D2→tag[1], etc.
+        var dimIdx = -1;
+        dimensionDefs.forEach(function(d, i) { if (d.id === bestDim) dimIdx = i; });
+        if (dimIdx >= 0 && dimIdx < possibleTags.length) {
+          tag = possibleTags[dimIdx];
+        }
+      }
+
+      if (!tag || tag === personalityMapping.primary_tag) {
+        // Fallback: use the primary_tag
+        tag = personalityMapping.primary_tag || tag;
+      }
+    }
+
+    var tagName = personalityMapping.tag_name || tag;
+    document.getElementById('personality-badge').textContent = tag;
+    document.getElementById('personality-desc').textContent = tagName + ' · ' + (personalityMapping.community_description || '');
+
+    // Analysis cards — use LLM-generated rich analysis
+    var cardsDiv = document.getElementById('analysis-cards');
+    cardsDiv.innerHTML = '';
+    var analysisMap = {};
+    if (Array.isArray(analysisData)) {
+      analysisData.forEach(function(a) { analysisMap[a.dim_id] = a; });
+    }
+    dimensionDefs.forEach(function(dim) {
+      var score = normalized[dim.id];
+      var a = analysisMap[dim.id] || {};
+      var core = a['核心特质'] || (score >= 50 ? '你偏向' + (dim.high_label || '高') + '型表达。' : '你偏向' + (dim.low_label || '低') + '型表达。');
+      var blind = a['潜在盲点'] || '任何性格倾向都是一体两面，优势的背面就是盲点。';
+      var advice = a['专属建议'] || '认识自己只是第一步，行动才能带来改变。';
+
+      var card = document.createElement('div');
+      card.className = 'analysis-card';
+      card.innerHTML = '<h3>' + dim.name + '</h3>'
+        + '<div class="score">' + score + '<span style="font-size:0.5em;color:var(--text-secondary)"> / 100</span></div>'
+        + '<div class="detail">'
+        + '<strong>🔍 核心特质</strong><p>' + core + '</p>'
+        + '<strong>⚠️ 潜在盲点</strong><p>' + blind + '</p>'
+        + '<strong>💡 专属建议</strong><p>' + advice + '</p>'
+        + '</div>';
+      cardsDiv.appendChild(card);
+    });
+  }
+
+  // ═══ Init ═══
+  document.getElementById('total-questions').textContent = questions.length;
+
+  // Check for saved progress
+  (function() {
+    var saved = loadProgress();
+    if (saved && saved.answers && Object.keys(saved.answers).length > 0) {
+      var doneCount = Object.keys(saved.answers).length;
+      document.getElementById('btn-continue').style.display = 'inline-block';
+      document.getElementById('saved-info').style.display = 'block';
+      document.getElementById('saved-info').textContent = '上次已完成 ' + doneCount + '/' + questions.length + ' 题，进度已自动保存';
+    }
+  })();
+</script>
+</body>
+</html>
