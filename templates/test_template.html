@@ -276,6 +276,8 @@
   function showSection(id) {
     document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
     document.getElementById(id).classList.add('active');
+    // 触发按钮被隐藏后仍持有焦点,浏览器会把滚动拉回其原位置、打断回顶——先释放焦点
+    if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -339,7 +341,6 @@
     btnNext.onclick = function() { nextQuestion(); };
 
     if (currentQ > 0) { saveProgress(); }
-    document.getElementById('question-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function nextQuestion() {
