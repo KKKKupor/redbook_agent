@@ -77,12 +77,29 @@ def publisher_node(state: dict) -> dict:
     (deploy_dir / "index.html").write_text(html_content, encoding="utf-8")
     (deploy_dir / "vercel.json").write_text('{"version": 2}', encoding="utf-8")
 
+    # 封面/商品图截图(部署前生成,随站点一起上线;失败不阻塞主流程)
+    capture_ok = True
+    try:
+        from utils.cover_shots import capture_cover_images
+        capture_cover_images(deploy_dir / "index.html", deploy_dir)
+        logger.info("Publisher: cover images generated")
+    except Exception as e:
+        capture_ok = False
+        logger.warning(f"Publisher: cover capture failed (posting will degrade): {e}")
+
     logger.info("Publisher: deploying to Vercel...")
     url = _deploy_to_vercel(str(deploy_dir))
 
-    if not url:
-        url = str(deploy_dir / "index.html")
-        logger.warning(f"Publisher: using local path: {url}")
+    from utils.posting_materials import derive_image_urls
+    if url and capture_ok:
+        image_urls = derive_image_urls(url)
+    else:
+        if url:
+            logger.warning("Publisher: deploy ok but capture failed — image URLs left empty for message degradation")
+        else:
+            url = str(deploy_dir / "index.html")
+            logger.warning(f"Publisher: using local path: {url}")
+        image_urls = {"cover_image_url": "", "result_image_url": "", "product_image_url": ""}
 
-    save("publisher", "deploy_result.json", {"url": url, "topic": topic})
-    return {"html_url": url, "xhs_note_id": "", "actual_publish_time": scheduled_time}
+    save("publisher", "deploy_result.json", {"url": url, "topic": topic, **image_urls})
+    return {"html_url": url, "xhs_note_id": "", "actual_publish_time": scheduled_time, **image_urls}
