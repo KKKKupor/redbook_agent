@@ -2,26 +2,6 @@
 
 from datetime import datetime
 
-from loguru import logger
-
-
-def derive_image_urls(base_url: str) -> dict:
-    """由部署 base URL 推导 3 张图片公网 URL。空串输入→三个空串。
-
-    调用方约定:仅部署成功时传入真实 URL(Vercel hostname 或完整 URL),
-    部署失败传空串。不会收到本地路径。
-    """
-    if not base_url:
-        return {"cover_image_url": "", "result_image_url": "", "product_image_url": ""}
-    base = base_url.strip().rstrip("/")
-    if not base.startswith(("http://", "https://")):
-        base = "https://" + base
-    return {
-        "cover_image_url": f"{base}/cover.png",
-        "result_image_url": f"{base}/result.png",
-        "product_image_url": f"{base}/product.png",
-    }
-
 
 def _format_publish_time(value) -> str:
     if isinstance(value, datetime):

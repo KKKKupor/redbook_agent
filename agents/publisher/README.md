@@ -23,4 +23,4 @@
 - 部署依赖本机代理可用(git http.proxy)与GitHub凭据;失败时降级本地路径、素材消息提示"部署失败"
 - GitHub Pages发布有1-2分钟生效延迟
 - Python subprocess找不到`npx vercel`（PATH不包含npm全局bin）。已通过`shell=True`解决。
-- 当前部署命令：`npx vercel output/deploy/latest --prod --yes`
+- 当前部署命令：`git push origin gh-pages`（由 utils/ghpages_deploy.py 自动执行，含代理/身份继承）

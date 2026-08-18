@@ -43,44 +43,45 @@ def capture_cover_images(html_path: Path, out_dir: Path) -> dict:
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-        context = browser.new_context(viewport=VIEWPORT_COVER, locale="zh-CN")
-        page = context.new_page()
-
-        # 1) 起始页封面(3:4)—— wait_until="commit" 避免被 Chart.js CDN 拖慢
-        page.goto(html_uri, wait_until="commit", timeout=30000)
-        # 确定性首帧信号:等待 #landing 的 fadeSlideIn(0.5s)动画完成,
-        # 替代固定延时/visible 信号(二者都会在动画中途截图,得到半透明残影)
-        page.wait_for_function(
-            "getComputedStyle(document.getElementById('landing')).opacity === '1'",
-            timeout=5000,
-        )
-        page.screenshot(path=str(out_dir / "cover.png"))
-
-        # 2) 答题到结果页,截雷达图(3:4)
-        # 等模板应用脚本就绪(阻塞的 Chart.js CDN 挂起时这里 30s 超时抛异常,由调用方降级)
-        page.wait_for_function("typeof startTest === 'function'", timeout=30000)
-        page.click("#btn-start-new")
-        _answer_all_questions(page)
         try:
-            page.wait_for_function("typeof Chart !== 'undefined'", timeout=CHART_TIMEOUT_MS)
-        except Exception:
-            # CDN 正常但图表加载慢:照常截图,雷达图可能缺失
-            # (CDN 完全挂起时应用脚本不执行,上面 wait_for_function 已抛异常,整个截图失败由调用方降级)
-            logger.warning("cover_shots: Chart.js CDN 15s 超时,照常截图(雷达图可能缺失)")
-        page.wait_for_timeout(1500)  # 等 Chart 动画完成
-        # 结果区约 2900px 高,scroll_into_view_if_needed 会把整区居中导致雷达图在视口上方;
-        # 用 block:'start' 把结果区顶部(人格标签+雷达图)对齐到视口顶部
-        page.evaluate("document.getElementById('results-section').scrollIntoView({ block: 'start' })")
-        page.wait_for_timeout(300)
-        page.screenshot(path=str(out_dir / "result.png"))
+            context = browser.new_context(viewport=VIEWPORT_COVER, locale="zh-CN")
+            page = context.new_page()
 
-        # 3) 商品主图(1:1)—— 重新以方形视口加载起始页
-        page.set_viewport_size(VIEWPORT_PRODUCT)
-        page.goto(html_uri, wait_until="commit", timeout=30000)
-        page.wait_for_timeout(800)
-        page.screenshot(path=str(out_dir / "product.png"))
+            # 1) 起始页封面(3:4)—— wait_until="commit" 避免被 Chart.js CDN 拖慢
+            page.goto(html_uri, wait_until="commit", timeout=30000)
+            # 确定性首帧信号:等待 #landing 的 fadeSlideIn(0.5s)动画完成,
+            # 替代固定延时/visible 信号(二者都会在动画中途截图,得到半透明残影)
+            page.wait_for_function(
+                "getComputedStyle(document.getElementById('landing')).opacity === '1'",
+                timeout=5000,
+            )
+            page.screenshot(path=str(out_dir / "cover.png"))
 
-        browser.close()
+            # 2) 答题到结果页,截雷达图(3:4)
+            # 等模板应用脚本就绪(阻塞的 Chart.js CDN 挂起时这里 30s 超时抛异常,由调用方降级)
+            page.wait_for_function("typeof startTest === 'function'", timeout=30000)
+            page.click("#btn-start-new")
+            _answer_all_questions(page)
+            try:
+                page.wait_for_function("typeof Chart !== 'undefined'", timeout=CHART_TIMEOUT_MS)
+            except Exception:
+                # CDN 正常但图表加载慢:照常截图,雷达图可能缺失
+                # (CDN 完全挂起时应用脚本不执行,上面 wait_for_function 已抛异常,整个截图失败由调用方降级)
+                logger.warning("cover_shots: Chart.js CDN 15s 超时,照常截图(雷达图可能缺失)")
+            page.wait_for_timeout(1500)  # 等 Chart 动画完成
+            # 结果区约 2900px 高,scroll_into_view_if_needed 会把整区居中导致雷达图在视口上方;
+            # 用 block:'start' 把结果区顶部(人格标签+雷达图)对齐到视口顶部
+            page.evaluate("document.getElementById('results-section').scrollIntoView({ block: 'start' })")
+            page.wait_for_timeout(300)
+            page.screenshot(path=str(out_dir / "result.png"))
+
+            # 3) 商品主图(1:1)—— 重新以方形视口加载起始页
+            page.set_viewport_size(VIEWPORT_PRODUCT)
+            page.goto(html_uri, wait_until="commit", timeout=30000)
+            page.wait_for_timeout(800)
+            page.screenshot(path=str(out_dir / "product.png"))
+        finally:
+            browser.close()
 
     result = {name: out_dir / f"{name}.png" for name in ("cover", "result", "product")}
     logger.info(f"cover_shots: 3 张图已生成 → {out_dir}")

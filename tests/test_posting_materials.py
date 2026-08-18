@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from utils.posting_materials import build_message, derive_image_urls
+from utils.posting_materials import build_message
 
 
 def _full_state() -> dict:
@@ -57,22 +57,3 @@ class TestBuildMessage:
         state["scheduled_publish_time"] = None
         msg = build_message(state)
         assert "未定" in msg
-
-
-class TestDeriveImageUrls:
-    def test_bare_vercel_hostname_gets_scheme(self):
-        urls = derive_image_urls("my-app.vercel.app")
-        assert urls["cover_image_url"] == "https://my-app.vercel.app/cover.png"
-        assert urls["result_image_url"] == "https://my-app.vercel.app/result.png"
-        assert urls["product_image_url"] == "https://my-app.vercel.app/product.png"
-
-    def test_existing_https_kept_and_trailing_slash_stripped(self):
-        urls = derive_image_urls("https://my-app.vercel.app/")
-        assert urls["cover_image_url"] == "https://my-app.vercel.app/cover.png"
-
-    def test_empty_returns_empty(self):
-        assert derive_image_urls("") == {
-            "cover_image_url": "",
-            "result_image_url": "",
-            "product_image_url": "",
-        }
