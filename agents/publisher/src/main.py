@@ -86,6 +86,11 @@ def publisher_node(state: dict) -> dict:
     except Exception as e:
         capture_ok = False
         logger.warning(f"Publisher: cover capture failed (posting will degrade): {e}")
+        for stale in ("cover.png", "result.png", "product.png"):
+            p = deploy_dir / stale
+            if p.exists():
+                p.unlink()
+                logger.info(f"Publisher: removed stale/partial image {p.name}")
 
     logger.info("Publisher: deploying to Vercel...")
     url = _deploy_to_vercel(str(deploy_dir))
