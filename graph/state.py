@@ -35,6 +35,9 @@ class AgentState(TypedDict, total=False):
     html_url: str
     xhs_note_id: str
     actual_publish_time: datetime
+    cover_image_url: str
+    result_image_url: str
+    product_image_url: str
 
     # ===== Cost & Monitoring =====
     total_token_cost: float
