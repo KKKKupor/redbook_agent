@@ -4,6 +4,7 @@
 
 ## 职责
 - 汇总运行结果并推送钉钉日报
+- 推送「发帖素材」消息(文案+3图+建议发布时间;由 main.py run_once 内联调用 utils/posting_materials)
 - ~~Token成本核算~~ (待实现CallbackHandler)
 - ~~ROI计算~~ (无销售数据)
 
