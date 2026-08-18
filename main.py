@@ -133,6 +133,15 @@ def run_once():
         except Exception as e:
             logger.warning(f"Notification failed: {e}")
 
+        # Posting material message — separate push after the daily report
+        try:
+            from utils.posting_materials import build_message
+            msg = build_message(result)
+            if msg:
+                notifier.send(title=f"小红书发帖素材 - {topic}", content=msg, level="info")
+        except Exception as e:
+            logger.warning(f"Posting material push failed: {e}")
+
         return result
 
     except Exception as e:
