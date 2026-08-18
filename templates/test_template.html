@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ theme | default('light') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{{ title }}</title>
+<style>
+  :root {
+    --bg: #faf9f6;
+    --surface: #ffffff;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --accent: {{ accent_color | default('#6c5ce7') }};
+    --accent-light: {{ accent_light | default('#a29bfe') }};
+    --accent-glass: {{ accent_glass | default('rgba(108,92,231,0.08)') }};
+    --border: #e5e7eb;
+    --shadow: 0 2px 16px rgba(0,0,0,0.06);
+    --radius: 16px;
+    --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  [data-theme="dark"] {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --text: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --border: #2d2d44;
+    --shadow: 0 2px 16px rgba(0,0,0,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    transition: background var(--transition), color var(--transition);
+    overflow-x: hidden;
+  }
+
+  /* ── Theme toggle ── */
+  #theme-toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 18px; cursor: pointer;
+    box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    transition: all var(--transition);
+  }
+  #theme-toggle:hover { transform: scale(1.08); }
+
+  /* ── Section visibility ── */
+  .section { display: none; }
+  .section.active { display: block; animation: fadeSlideIn 0.5s ease; }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Landing Page ── */
+  #landing {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 100vh; padding: 32px 20px;
+    text-align: center;
+  }
+  #landing .icon { font-size: 64px; margin-bottom: 20px; }
+  #landing h1 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; line-height: 1.3; }
+  #landing .tagline { font-size: 1.05rem; color: var(--text-secondary); max-width: 380px; margin-bottom: 32px; line-height: 1.6; }
+  #landing .meta { display: flex; gap: 24px; margin-bottom: 40px; }
+  #landing .meta-item { text-align: center; }
+  #landing .meta-item .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  #landing .meta-item .label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
+  .btn-start {
+    display: inline-block; padding: 14px 48px;
+    background: var(--accent); color: #fff;
+    font-size: 1.1rem; font-weight: 600;
+    border: none; border-radius: 50px;
+    cursor: pointer;
+    transition: all var(--transition);
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px {{ accent_glass | default('rgba(108,92,231,0.3)') }};
+  }
+  .btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 28px {{ accent_glass | default('rgba(108,92,231,0.4)') }}; }
+
+  /* ── Test Section ── */
+  #test-section { max-width: 600px; margin: 0 auto; padding: 20px; }
+  .progress-wrap { margin-bottom: 32px; }
+  .progress-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+  .progress-bar {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%; background: var(--accent); border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+  .question-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 32px 24px; box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    animation: fadeSlideIn 0.4s ease;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .question-card .q-num { font-size: 0.85rem; color: var(--accent); font-weight: 600; margin-bottom: 16px; }
+  .question-card .q-text { font-size: 1.15rem; line-height: 1.7; margin-bottom: 28px; font-weight: 500; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option-btn {
+    display: block; width: 100%; padding: 16px 20px;
+    background: var(--bg); border: 2px solid var(--border);
+    border-radius: 12px; font-size: 0.95rem; text-align: left;
+    cursor: pointer; font-family: var(--font);
+    transition: all 0.2s ease;
+    color: var(--text);
+  }
+  .option-btn:hover { border-color: var(--accent-light); background: var(--accent-glass); }
+  .option-btn.selected { border-color: var(--accent); background: var(--accent-glass); font-weight: 500; }
+  .nav-btns { display: flex; justify-content: space-between; margin-top: 24px; gap: 12px; }
+  .btn-nav {
+    padding: 12px 28px; border-radius: 50px; font-size: 0.95rem;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: var(--font);
+    transition: all var(--transition);
+  }
+  .btn-nav:hover { border-color: var(--accent); }
+  .btn-nav:disabled { opacity: 0.4; cursor: default; }
+  .btn-nav.primary { background: var(--accent); color: #fff; border: none; }
+
+  /* ── Results Section ── */
+  #results-section { max-width: 640px; margin: 0 auto; padding: 20px; }
+  .result-header { text-align: center; margin-bottom: 32px; }
+  .result-header h1 { font-size: 1.6rem; font-weight: 800; }
+  .result-header .personality-badge {
+    display: inline-block; margin-top: 16px;
+    padding: 10px 28px; background: var(--accent-glass);
+    border: 2px solid var(--accent); border-radius: 50px;
+    font-size: 1.4rem; font-weight: 700; color: var(--accent);
+  }
+  .chart-wrap { max-width: 380px; margin: 0 auto 40px; }
+  .analysis-cards { display: flex; flex-direction: column; gap: 16px; }
+  .analysis-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .analysis-card h3 { font-size: 1rem; margin-bottom: 4px; color: var(--accent); }
+  .analysis-card .score { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+  .analysis-card .detail { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+  .analysis-card .detail strong { color: var(--text); display: block; margin-top: 10px; }
+  .btn-share {
+    display: block; margin: 32px auto; padding: 12px 40px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50px; font-size: 0.95rem; cursor: pointer;
+    font-family: var(--font); color: var(--text);
+    transition: all var(--transition);
+  }
+  .btn-share:hover { border-color: var(--accent); color: var(--accent); }
+  .footer { text-align: center; padding: 24px; font-size: 0.8rem; color: var(--text-secondary); }
+
+  @media (max-width: 480px) {
+    #landing h1 { font-size: 1.5rem; }
+    #landing .meta { gap: 16px; }
+    .question-card { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" onclick="toggleTheme()" title="切换主题">🌓</button>
+
+<!-- ═══ Landing Page ═══ -->
+<div id="landing" class="section active">
+  <div class="icon">{{ icon_emoji | default('🧠') }}</div>
+  <h1>{{ title }}</h1>
+  <p class="tagline">{{ tagline | default('60道情境测试题，6维深度分析，揭示你未曾了解的自己') }}</p>
+  <div class="meta">
+    <div class="meta-item"><div class="num" id="total-questions">60</div><div class="label">道情境题</div></div>
+    <div class="meta-item"><div class="num">6</div><div class="label">维度分析</div></div>
+    <div class="meta-item"><div class="num">~8</div><div class="label">分钟</div></div>
+  </div>
+  <button class="btn-start" id="btn-start-new" onclick="startTest(false)">开始测试</button>
+  <button class="btn-start" id="btn-continue" onclick="startTest(true)" style="display:none;background:var(--surface);color:var(--accent);border:2px solid var(--accent);">继续上次答题</button>
+  <div id="saved-info" style="margin-top:12px;font-size:0.8rem;color:var(--text-secondary);display:none;"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);border:1px solid var(--border);padding:10px 24px;border-radius:50px;font-size:0.85rem;box-shadow:var(--shadow);z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none;">已保存</div>
+
+<!-- ═══ Test Section ═══ -->
+<div id="test-section" class="section">
+  <div class="progress-wrap">
+    <div class="progress-info"><span id="progress-label">第 1 题 / 共 60 题</span><span id="progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="question-card" id="question-card">
+    <div class="q-num" id="q-num"></div>
+    <div class="q-text" id="q-text"></div>
+    <div class="options" id="q-options"></div>
+  </div>
+  <div class="nav-btns">
+    <button class="btn-nav" id="btn-prev" onclick="prevQuestion()" disabled>← 上一题</button>
+    <button class="btn-nav primary" id="btn-next" onclick="nextQuestion()">下一题 →</button>
+  </div>
+</div>
+
+<!-- ═══ Results Section ═══ -->
+<div id="results-section" class="section">
+  <div class="result-header">
+    <h1>{{ title }} — 你的结果</h1>
+    <div class="personality-badge" id="personality-badge">{{ default_personality | default('ENFP') }}</div>
+    <p style="margin-top:8px;color:var(--text-secondary);font-size:0.9rem;" id="personality-desc"></p>
+  </div>
+  <div class="chart-wrap"><canvas id="radarChart"></canvas></div>
+  <div class="analysis-cards" id="analysis-cards"></div>
+  <button class="btn-share" onclick="restartTest()">再做一次</button>
+</div>
+
+<div class="footer">仅供娱乐</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // ═══ Data ═══
+  const questions = {{ questions_json | safe }};
+  const dimensionDefs = {{ dimension_defs | safe }};
+  const personalityMapping = {{ personality_mapping | safe }};
+  const analysisData = {{ analysis_data | safe }};
+  const STORAGE_KEY = 'xhs_test_' + (personalityMapping.classification_type || 'test') + '_' + questions.length;
+
+  // ═══ State ═══
+  let currentQ = 0;
+  const answers = {};
+  let radarChart = null;
+
+  // ═══ Save/Load ═══
+  function saveProgress() {
+    var data = {
+      answers: answers,
+      currentQ: currentQ,
+      savedAt: new Date().toISOString(),
+      topic: '{{ title }}',
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      return data;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function clearProgress() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.opacity = '1';
+    setTimeout(function() { t.style.opacity = '0'; }, 1800);
+  }
+
+  // ═══ Theme ═══
+  function toggleTheme() {
+    var html = document.documentElement;
+    var cur = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  }
+
+  // ═══ Navigation ═══
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function startTest(restore) {
+    if (restore) {
+      var saved = loadProgress();
+      if (saved && saved.answers) {
+        Object.assign(answers, saved.answers);
+        currentQ = saved.currentQ || 0;
+      }
+    } else {
+      clearProgress();
+    }
+    showSection('test-section');
+    renderQuestion();
+  }
+
+  function restartTest() {
+    Object.keys(answers).forEach(function(k) { delete answers[k]; });
+    clearProgress();
+    if (radarChart) { radarChart.destroy(); radarChart = null; }
+    currentQ = 0;
+    showSection('landing');
+  }
+
+  // ═══ Question Rendering ═══
+  function renderQuestion() {
+    if (currentQ >= questions.length) {
+      clearProgress();
+      calculateResults();
+      return;
+    }
+    var q = questions[currentQ];
+    document.getElementById('q-num').textContent = '第 ' + (currentQ + 1) + ' 题';
+    document.getElementById('q-text').textContent = q.text;
+
+    var optsDiv = document.getElementById('q-options');
+    optsDiv.innerHTML = '';
+    q.options.forEach(function(opt, idx) {
+      var btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.textContent = opt.label + '. ' + opt.text;
+      if (answers[q.id] === idx) { btn.classList.add('selected'); }
+      btn.onclick = function() {
+        answers[q.id] = idx;
+        optsDiv.querySelectorAll('.option-btn').forEach(function(b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+        saveProgress();
+      };
+      optsDiv.appendChild(btn);
+    });
+
+    var pct = Math.round((currentQ / questions.length) * 100);
+    document.getElementById('progress-label').textContent = '第 ' + (currentQ + 1) + ' 题 / 共 ' + questions.length + ' 题';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-fill').style.width = pct + '%';
+
+    document.getElementById('btn-prev').disabled = (currentQ === 0);
+    var btnNext = document.getElementById('btn-next');
+    btnNext.textContent = (currentQ === questions.length - 1) ? '查看结果 →' : '下一题 →';
+    btnNext.onclick = function() { nextQuestion(); };
+
+    if (currentQ > 0) { saveProgress(); }
+    document.getElementById('question-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function nextQuestion() {
+    var q = questions[currentQ];
+    if (answers[q.id] === undefined) {
+      var card = document.getElementById('question-card');
+      card.style.animation = 'none'; card.offsetHeight; card.style.animation = 'shake 0.4s ease';
+      return;
+    }
+    currentQ++;
+    if (currentQ >= questions.length) {
+      calculateResults();
+    } else {
+      renderQuestion();
+    }
+  }
+
+  function prevQuestion() {
+    if (currentQ > 0) { currentQ--; renderQuestion(); }
+  }
+
+  // ═══ Keyframes ═══
+  var shakeStyle = document.createElement('style');
+  shakeStyle.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}';
+  document.head.appendChild(shakeStyle);
+
+  // ═══ Results ═══
+  function calculateResults() {
+    showSection('results-section');
+
+    // Sum scores
+    var rawScores = {};
+    dimensionDefs.forEach(function(d) { rawScores[d.id] = 0; });
+    questions.forEach(function(q) {
+      var optIdx = answers[q.id];
+      if (optIdx !== undefined && q.options[optIdx] && q.options[optIdx].scores) {
+        var scores = q.options[optIdx].scores;
+        Object.keys(scores).forEach(function(dim) { rawScores[dim] = (rawScores[dim] || 0) + scores[dim]; });
+      }
+    });
+
+    // Normalize 0-100 (dynamic scoring: max = round(100/question_count))
+    var maxPerQ = {{ max_score_per_question | default(3) }};
+    var maxPossible = questions.length * maxPerQ;
+    var normalized = {};
+    Object.keys(rawScores).forEach(function(dim) {
+      var pct = Math.round((rawScores[dim] / Math.max(1, maxPossible)) * 100);
+      normalized[dim] = Math.min(100, pct);
+    });
+
+    // Radar chart
+    var ctx = document.getElementById('radarChart').getContext('2d');
+    if (radarChart) { radarChart.destroy(); }
+    var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    radarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: dimensionDefs.map(function(d) { return d.name; }),
+        datasets: [{
+          label: '你的得分',
+          data: dimensionDefs.map(function(d) { return normalized[d.id]; }),
+          backgroundColor: accent + '33',
+          borderColor: accent,
+          borderWidth: 2.5,
+          pointBackgroundColor: accent,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          tension: 0.2,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 11 } } } },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // Personality badge — computed from highest dimension score
+    var isMBTI = personalityMapping.classification_type === 'mbti';
+    var tag = personalityMapping.primary_tag || 'N/A';
+
+    if (isMBTI) {
+      // Legacy MBTI: use rules {E: "D1>50", N: "D2>50", ...}
+      var rules = personalityMapping.rules || {};
+      var parts = [];
+      if (rules.E) { var m = rules.E.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'E' : 'I'); }
+      if (rules.N) { var m = rules.N.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'N' : 'S'); }
+      if (rules.T) { var m = rules.T.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'T' : 'F'); }
+      if (rules.J) { var m = rules.J.match(/D(\d+).*?(\d+)/); parts.push(normalized['D'+m[1]] >= parseInt(m[2]) ? 'J' : 'P'); }
+      tag = parts.length >= 4 ? parts.join('') : tag;
+    } else {
+      // Non-MBTI: find the user's ACTUAL highest-scoring dimension, use corresponding tag
+      var possibleTags = personalityMapping.possible_tags || [];
+      var dominantDim = personalityMapping.dominant_dim || '';
+
+      // Find which dimension has the highest normalized score
+      var bestDim = dominantDim;
+      var bestScore = -1;
+      dimensionDefs.forEach(function(d) {
+        var s = normalized[d.id] || 0;
+        if (s > bestScore) { bestScore = s; bestDim = d.id; }
+      });
+
+      if (possibleTags.length > 0 && bestDim) {
+        // Map by index: D1→tag[0], D2→tag[1], etc.
+        var dimIdx = -1;
+        dimensionDefs.forEach(function(d, i) { if (d.id === bestDim) dimIdx = i; });
+        if (dimIdx >= 0 && dimIdx < possibleTags.length) {
+          tag = possibleTags[dimIdx];
+        }
+      }
+
+      if (!tag || tag === personalityMapping.primary_tag) {
+        // Fallback: use the primary_tag
+        tag = personalityMapping.primary_tag || tag;
+      }
+    }
+
+    var tagName = personalityMapping.tag_name || tag;
+    document.getElementById('personality-badge').textContent = tag;
+    document.getElementById('personality-desc').textContent = tagName + ' · ' + (personalityMapping.community_description || '');
+
+    // Analysis cards — use LLM-generated rich analysis
+    var cardsDiv = document.getElementById('analysis-cards');
+    cardsDiv.innerHTML = '';
+    var analysisMap = {};
+    if (Array.isArray(analysisData)) {
+      analysisData.forEach(function(a) { analysisMap[a.dim_id] = a; });
+    }
+    dimensionDefs.forEach(function(dim) {
+      var score = normalized[dim.id];
+      var a = analysisMap[dim.id] || {};
+      var core = a['核心特质'] || (score >= 50 ? '你偏向' + (dim.high_label || '高') + '型表达。' : '你偏向' + (dim.low_label || '低') + '型表达。');
+      var blind = a['潜在盲点'] || '任何性格倾向都是一体两面，优势的背面就是盲点。';
+      var advice = a['专属建议'] || '认识自己只是第一步，行动才能带来改变。';
+
+      var card = document.createElement('div');
+      card.className = 'analysis-card';
+      card.innerHTML = '<h3>' + dim.name + '</h3>'
+        + '<div class="score">' + score + '<span style="font-size:0.5em;color:var(--text-secondary)"> / 100</span></div>'
+        + '<div class="detail">'
+        + '<strong>🔍 核心特质</strong><p>' + core + '</p>'
+        + '<strong>⚠️ 潜在盲点</strong><p>' + blind + '</p>'
+        + '<strong>💡 专属建议</strong><p>' + advice + '</p>'
+        + '</div>';
+      cardsDiv.appendChild(card);
+    });
+  }
+
+  // ═══ Init ═══
+  document.getElementById('total-questions').textContent = questions.length;
+
+  // Check for saved progress
+  (function() {
+    var saved = loadProgress();
+    if (saved && saved.answers && Object.keys(saved.answers).length > 0) {
+      var doneCount = Object.keys(saved.answers).length;
+      document.getElementById('btn-continue').style.display = 'inline-block';
+      document.getElementById('saved-info').style.display = 'block';
+      document.getElementById('saved-info').textContent = '上次已完成 ' + doneCount + '/' + questions.length + ' 题，进度已自动保存';
+    }
+  })();
+</script>
+</body>
+</html>

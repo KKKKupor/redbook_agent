@@ -1,0 +1,57 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data
+data/*
+!data/.gitkeep
+
+# Self-heal patches
+.temp_fix/*
+!.temp_fix/.gitkeep
+
+# Generated output
+output/
+
+# External reference projects (not part of the product)
+github_example/
+xiaohongshu-ai-workbench-main/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Logs
+*.log
+logs/
+
+# Virtual env
+venv/
+.venv/
+
+# Chroma
+chroma_db/
+
+# pytest
+.pytest_cache/
