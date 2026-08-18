@@ -110,8 +110,12 @@ def deploy_to_ghpages(deploy_dir: Path, date_str: str) -> dict:
         (tmp / ".nojekyll").touch()
 
         _git(tmp, "add", "-A")
-        _git(tmp, "commit", "-m", f"deploy {date_str}")
-        _git(tmp, "push", "origin", "gh-pages")
+        # 内容与远端完全一致时无可提交(同日重跑):跳过 commit/push,视为部署成功
+        if _git(tmp, "status", "--porcelain"):
+            _git(tmp, "commit", "-m", f"deploy {date_str}")
+            _git(tmp, "push", "origin", "gh-pages")
+        else:
+            logger.info("ghpages_deploy: 内容与远端一致,跳过 commit/push")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
