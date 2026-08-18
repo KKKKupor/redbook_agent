@@ -276,6 +276,7 @@
   function showSection(id) {
     document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
     document.getElementById(id).classList.add('active');
+    if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -339,7 +340,7 @@
     btnNext.onclick = function() { nextQuestion(); };
 
     if (currentQ > 0) { saveProgress(); }
-    document.getElementById('question-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
   }
 
   function nextQuestion() {
