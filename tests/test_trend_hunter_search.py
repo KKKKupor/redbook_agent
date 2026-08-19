@@ -40,7 +40,9 @@ class TestGetSearchContext:
         written = {"v": None}
 
         monkeypatch.setattr("tools.xhs_search.read_cache", lambda kw: None)
-        monkeypatch.setattr("tools.xhs_search.search_notes", lambda kw: notes)
+        monkeypatch.setattr("tools.xhs_search.search_notes", lambda kw, **kwargs: notes)
+        # search_notes already returns the final bounded list; model filter_notes as identity
+        monkeypatch.setattr("tools.xhs_search.filter_notes", lambda ns, **kwargs: ns)
         monkeypatch.setattr("tools.xhs_search.write_cache", lambda kw, n: written.update(v=(kw, n)))
         assert hunter.get_search_context("MBTI测试") == notes
         assert written["v"] == ("MBTI测试", notes)
@@ -48,7 +50,7 @@ class TestGetSearchContext:
     def test_returns_none_when_live_fails(self, monkeypatch):
         monkeypatch.setattr("tools.xhs_search.read_cache", lambda kw: None)
 
-        def boom(kw):
+        def boom(kw, **kwargs):
             raise RuntimeError("no valid cookie")
 
         monkeypatch.setattr("tools.xhs_search.search_notes", boom)
