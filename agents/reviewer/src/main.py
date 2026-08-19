@@ -9,6 +9,7 @@ from utils.llm_factory import create_llm  # reviewer uses moderate temp
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
+from utils.health import note
 
 
 REVIEWER_SYSTEM_PROMPT = load_skill(__file__, "system")
@@ -147,6 +148,7 @@ def reviewer_node(state: dict) -> dict:
 
     except Exception as e:
         logger.warning(f"Reviewer parse failed: {e}, using fallback")
+        note("reviewer", "llm_parse_failed", str(e)[:200])
         result = {
             "overall_score": 6.0,
             "verdict": "revise",

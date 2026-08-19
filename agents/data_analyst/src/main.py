@@ -15,6 +15,7 @@ from utils.llm_factory import analyst_llm
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
+from utils.health import note
 from tools.sales_tools import (
     get_sales_analytics,
     get_product_rankings,
@@ -71,6 +72,7 @@ def data_analyst_node(state: dict) -> dict:
         logger.info("Data Analyst: report generated")
     except Exception as e:
         logger.warning(f"Data analyst LLM call failed: {e}")
+        note("data_analyst", "analytics_failed", str(e)[:200])
 
     return {
         "_analysis_report": str(response.content) if 'response' in dir() else "N/A",

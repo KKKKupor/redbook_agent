@@ -8,6 +8,7 @@ from utils.llm_factory import hunter_llm
 from utils.review import save, save_prompt, save_response
 from utils.token_tracker import add_from_response
 from utils.prompt_loader import load_skill
+from utils.health import note
 
 
 HUNTER_SYSTEM_PROMPT = load_skill(__file__, "system")
@@ -78,6 +79,8 @@ def trend_hunter_node(state: dict) -> dict:
     # 三级回退获取真实搜索数据(缓存→live→None),注入 prompt
     notes = get_search_context(topic)
     save("trend_hunter", "search_context.json", {"topic": topic, "notes": notes or []})
+    if notes is None:
+        note("trend_hunter", "search_fallback", "cookies过期或网络失败,使用LLM先验")
 
     try:
         response = llm.invoke([
@@ -90,6 +93,7 @@ def trend_hunter_node(state: dict) -> dict:
         insights = _parse_json(response.content)
     except Exception as e:
         logger.warning(f"Trend hunter parse failed: {e}, using defaults")
+        note("trend_hunter", "llm_parse_failed", str(e)[:200])
         insights = {
             "title_formulas": ["测测你的______特质"],
             "question_structure": {"typical_count": 50, "options_per_question": 4},

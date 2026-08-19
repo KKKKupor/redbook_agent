@@ -23,6 +23,7 @@ from utils.llm_factory import navigator_llm
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
+from utils.health import note
 from tools.sales_tools import (
     get_product_rankings,
     get_competitor_trend,
@@ -77,15 +78,19 @@ def navigator_node(state: dict) -> dict:
         "动物塑测试", "去性别化人格测试", "心理压力指数测试",
         "情商测试", "社交人格测试", "抑郁倾向筛查",
     ]
+    pool_loaded = False
     if POOL_FILE.exists():
         try:
             pool_data = json.loads(POOL_FILE.read_text(encoding="utf-8"))
             scraped = pool_data.get("topics", [])
             if len(scraped) >= 6:
                 REAL_TOPIC_POOL = scraped
+                pool_loaded = True
                 logger.debug(f"Loaded {len(scraped)} topics from {POOL_FILE}")
         except Exception:
             pass
+    if not pool_loaded:
+        note("navigator", "topic_pool_hardcoded", "data/topic_pool.json 缺失或不足,使用硬编码话题池")
 
     import random as _random
     roll = _random.random()
@@ -140,6 +145,7 @@ def navigator_node(state: dict) -> dict:
 
     except (json.JSONDecodeError, Exception) as e:
         logger.error(f"Navigator JSON parse failed: {e}")
+        note("navigator", "llm_parse_failed", str(e)[:200])
         # Fallback: safe defaults
         decision = {
             "strategy": "exploit",

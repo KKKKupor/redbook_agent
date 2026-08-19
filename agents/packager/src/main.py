@@ -20,6 +20,7 @@ from utils.llm_factory import packager_llm
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
+from utils.health import note
 
 
 STYLE_PROMPT = load_skill(__file__, "style")
@@ -210,11 +211,13 @@ def _gen_copy(state: dict, llm) -> str:
                 logger.info("Packager: extracted recommended copy variant")
                 return recommended
             logger.warning("Packager: 首推版本 block invalid (no copy/tags) — using fallback copy")
+            note("packager", "copy_fallback", "首推版本文案不合格或异常,使用兜底文案")
             return FALLBACK_COPY
 
         # Fallback: old single-variant format, return as-is
         return raw
     except Exception:
+        note("packager", "copy_fallback", "首推版本文案不合格或异常,使用兜底文案")
         return FALLBACK_COPY
 
 

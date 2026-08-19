@@ -10,6 +10,7 @@ from models.base import get_session
 from models.product import Product
 from models.order import Order
 from models.strategy_log import StrategyLog
+from utils.health import note
 
 
 @tool
@@ -88,6 +89,7 @@ def get_product_rankings(time_range: str = "7d") -> list:
 @tool
 def get_competitor_trend(keyword: str) -> dict:
     """分析同类付费测试题的发布时间、定价区间、卖点。（暂用mock）"""
+    note("data", "mock_data", "该数据工具为 mock,无真实数据源")
     return {
         "keyword": keyword,
         "hot_publish_hours": [20, 21, 22],
@@ -101,6 +103,7 @@ def get_competitor_trend(keyword: str) -> dict:
 @tool
 def time_series_forecast(historical_data: Optional[list] = None) -> dict:
     """基于历史发布时间与销量相关性，预测最佳发布时间段。（暂用mock）"""
+    note("data", "mock_data", "该数据工具为 mock,无真实数据源")
     return {
         "best_hour": 21,
         "best_weekday": "周二",

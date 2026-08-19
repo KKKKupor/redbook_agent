@@ -9,6 +9,7 @@ from utils.llm_factory import generator_llm
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
+from utils.health import note
 
 
 GENERATOR_SYSTEM_PROMPT = load_skill(__file__, "system")
@@ -110,6 +111,7 @@ def generator_node(state: dict) -> dict:
 
     if not dimensions:
         logger.warning("No dimension_defs in state — using generic fallback")
+        note("generator", "dimension_fallback", "dimension_defs 缺失,使用通用维度")
         dimensions = [
             {"id": "D1", "name": "维度一", "high_label": "高", "low_label": "低"},
             {"id": "D2", "name": "维度二", "high_label": "高", "low_label": "低"},
@@ -174,6 +176,7 @@ def generator_node(state: dict) -> dict:
             logger.info(f"  Batch {batch_idx+1}: got {len(batch_questions)} questions")
         except Exception as e:
             logger.error(f"  Batch {batch_idx+1} failed: {e}")
+            note("generator", "generation_failed", str(e)[:200])
 
     if all_errors:
         logger.warning(f"Quality issues: {all_errors[:5]}")

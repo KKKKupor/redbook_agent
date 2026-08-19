@@ -8,6 +8,7 @@ V2.0: Xiaohongshu shop integration
 from pathlib import Path
 from loguru import logger
 from utils.review import save
+from utils.health import note
 
 
 def publisher_node(state: dict) -> dict:
@@ -33,6 +34,7 @@ def publisher_node(state: dict) -> dict:
     except Exception as e:
         capture_ok = False
         logger.warning(f"Publisher: cover capture failed (posting will degrade): {e}")
+        note("publisher", "capture_failed", str(e)[:200])
         for stale in ("cover.png", "result.png", "product.png"):
             p = deploy_dir / stale
             if p.exists():
@@ -53,6 +55,7 @@ def publisher_node(state: dict) -> dict:
             logger.warning("Publisher: deploy ok but capture failed — image URLs left empty for message degradation")
     except Exception as e:
         logger.warning(f"Publisher: deploy failed ({e}) — using local path")
+        note("publisher", "deploy_failed", str(e)[:200])
         url = str(deploy_dir / "index.html")
         image_urls = {"cover_image_url": "", "result_image_url": "", "product_image_url": ""}
 
