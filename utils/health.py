@@ -36,10 +36,10 @@ def note(node: str, kind: str, detail: str = "") -> None:
     if key in _seen:
         logger.debug(f"health: 重复降级 {node}/{kind} 已提醒,跳过")
         return
+    _seen.add(key)
     if _count >= _MAX_ALERTS_PER_RUN:
         logger.warning(f"health: 本次运行降级提醒已达上限 {_MAX_ALERTS_PER_RUN} 条")
         return
-    _seen.add(key)
     _count += 1
     try:
         notifier.send(

@@ -20,12 +20,19 @@ class GitOps:
     def auto_commit(self, message: str = "") -> str:
         """Stage all safe files and commit. Returns commit hash or empty string."""
         try:
-            # Stage only safe paths
+            # Stage only safe paths — porcelain git add 遵守 .gitignore
+            # (GitPython index.add(force=True) 会无视 gitignore,连带提交 .env/data/.git)
             for item in Path(self.repo.working_dir).iterdir():
                 name = item.name
-                if any(ex in name for ex in self.exclude_paths):
+                if name == ".git":
                     continue
-                self.repo.index.add([str(item)])
+                if any(ex.strip("/") == name for ex in self.exclude_paths):
+                    continue
+                try:
+                    self.repo.git.add(str(item))
+                except GitCommandError:
+                    # 被 .gitignore 忽略的路径 git add 会以非零码退出 — 跳过,不中断整体提交
+                    logger.debug(f"git add skipped (ignored): {name}")
 
             if not self.repo.index.diff("HEAD"):
                 logger.info("No changes to commit")

@@ -23,6 +23,7 @@
 - 竞品趋势和发布时间预测仍为mock（`get_competitor_trend`, `time_series_forecast`）。
 - 没有自有销售数据时报告基本为空。
 - 评论区分析已永久移除（V2.0暂缓）。
+- 竞品趋势/发布时间预测两个 mock 工具(get_competitor_trend/time_series_forecast)尚未被任何流程调用——健康提醒的 mock_data 项当前不会触发;后续接线真实调用时提醒自动生效。
 
 ## 文件
 ```

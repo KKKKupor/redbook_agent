@@ -144,13 +144,20 @@ def run_once():
         except Exception as e:
             logger.warning(f"Posting material push failed: {e}")
 
+        from utils.health import summary as health_summary
+        logger.info(f"Degradations: {health_summary()}")
         return result
 
     except Exception as e:
         logger.error(f"Workflow crashed: {e}")
+        from utils.health import summary as health_summary
+        logger.info(f"Degradations: {health_summary()}")
         # 错误分类 + REVIEW_MODE 下 Git 留痕(生产模式不自动提交,尊重红线)
-        from utils.health import classify_error
-        error_class = classify_error(e)
+        try:
+            from utils.health import classify_error
+            error_class = classify_error(e)
+        except Exception:
+            error_class = "unknown"
         commit_hash = ""
         if REVIEW_MODE:
             try:
