@@ -6,7 +6,7 @@ Usage:
     python quick_test.py "恋爱人格" 20 --price 2.99
 """
 
-import json, re, os, sys, subprocess, random as _random
+import json, os, sys, random as _random
 from pathlib import Path
 from datetime import datetime
 
@@ -24,26 +24,14 @@ from loguru import logger
 
 
 def deploy_vercel(html: str) -> str:
+    """部署到 GitHub Pages(函数名保留以最小化改动)。"""
     deploy_dir = Path(__file__).resolve().parent / "output" / "deploy" / "latest"
     deploy_dir.mkdir(parents=True, exist_ok=True)
     (deploy_dir / "index.html").write_text(html, encoding="utf-8")
-    (deploy_dir / "vercel.json").write_text('{"version": 2}', encoding="utf-8")
     try:
-        result = subprocess.run(
-            f'npx vercel "{deploy_dir}" --prod --yes',
-            capture_output=True, text=True, timeout=60,
-            cwd=str(deploy_dir), shell=True,
-            encoding="utf-8", errors="replace",
-        )
-        output = result.stdout or ""
-        data = json.loads(output) if output.strip().startswith("{") else {}
-        url = data.get("deployment", {}).get("url", "") or data.get("url", "")
-        if not url:
-            for line in output.split("\n"):
-                if "vercel.app" in line and "https://" in line:
-                    m = re.search(r'https://[^\s"]+', line)
-                    if m: url = m.group()
-        return url or str(deploy_dir / "index.html")
+        from utils.ghpages_deploy import deploy_to_ghpages
+        urls = deploy_to_ghpages(deploy_dir, datetime.now().strftime("%Y-%m-%d"))
+        return urls["html_url"]
     except Exception as e:
         logger.error(f"Deploy failed: {e}")
         return str(deploy_dir / "index.html")
