@@ -146,6 +146,16 @@ def run_once():
 
     except Exception as e:
         logger.error(f"Workflow crashed: {e}")
+        # 致命错误告警:推送后照常抛出(不吞异常)
+        try:
+            from utils.notifier import notifier, format_fatal_message
+            notifier.send(
+                title="🚨 小红书Agent组致命错误",
+                content=format_fatal_message("daily_workflow", e),
+                level="fatal",
+            )
+        except Exception as ne:
+            logger.error(f"Fatal alert failed to send: {ne}")
         raise
 
 

@@ -6,6 +6,8 @@ Configured via NOTIFICATION_CHANNELS env var (comma-separated).
 """
 
 import os
+import traceback
+from datetime import datetime
 import httpx
 from loguru import logger
 
@@ -73,3 +75,18 @@ class Notifier:
 
 # Singleton
 notifier = Notifier()
+
+
+def format_fatal_message(stage: str, error: BaseException) -> str:
+    """组装致命错误告警消息体(纯函数,便于单测)。"""
+    tb_lines = traceback.format_exception(type(error), error, error.__traceback__)
+    tail = "".join(tb_lines).strip().split("\n")[-5:]
+    msg = str(error)[:300]
+    return (
+        f"⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"📍 阶段: {stage}\n"
+        f"❌ 错误类型: {type(error).__name__}\n"
+        f"📝 信息: {msg or '(无信息)'}\n"
+        f"```\n{''.join(tail)[:800]}\n```\n"
+        f"👉 请查看 logs/app.log;环境类错误(网络/限流)恢复后重跑,代码类错误修复后重启调度。"
+    )
