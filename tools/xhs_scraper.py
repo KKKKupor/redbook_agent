@@ -17,6 +17,20 @@ POOL_FILE = Path(__file__).resolve().parent.parent / "data" / "topic_pool.json"
 
 SEARCH_QUERIES = ["测试题", "人格测试", "心理测试", "性格测试"]
 
+NOISE_WORDS = ("免费", "官方", "怎么", "为什么", "哪些", "什么")
+
+
+def _filter_noise(topics: list) -> list:
+    """过滤噪音话题:搜索词本身与带噪音词前缀的抓取产物。"""
+    out = []
+    for t in topics:
+        if t in SEARCH_QUERIES:
+            continue
+        if any(w in t for w in NOISE_WORDS):
+            continue
+        out.append(t)
+    return out
+
 DEFAULT_TOPIC_POOL = [
     "人格阴影测试", "童年创伤程度测试", "恋爱人格匹配测试",
     "危险人格类型测试", "职场性格测试", "MBTI深度解析",
@@ -58,7 +72,7 @@ def run_scrape():
     """Synchronous entry point for APScheduler."""
     logger.info("Scraper: weekly topic refresh starting...")
     try:
-        topics = asyncio.run(_scrape_topics())
+        topics = _filter_noise(asyncio.run(_scrape_topics()))
         if len(topics) >= MIN_TOPICS:
             merged = topics + [t for t in DEFAULT_TOPIC_POOL if t not in set(topics)]
             data = {
@@ -67,7 +81,7 @@ def run_scrape():
                 "scraped_count": len(topics),
             }
             POOL_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-            logger.info(f"Scraper: saved {len(topics)} topics -> {POOL_FILE}")
+            logger.info(f"Scraper: saved {len(merged)} topics ({len(topics)} scraped) -> {POOL_FILE}")
         else:
             logger.warning(f"Scraper: only {len(topics)} topics (need >= {MIN_TOPICS}), keeping old pool")
     except Exception as e:

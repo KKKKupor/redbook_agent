@@ -87,6 +87,6 @@ def format_fatal_message(stage: str, error: BaseException) -> str:
         f"📍 阶段: {stage}\n"
         f"❌ 错误类型: {type(error).__name__}\n"
         f"📝 信息: {msg or '(无信息)'}\n"
-        f"```\n{''.join(tail)[:800]}\n```\n"
+        f"```\n{'\n'.join(tail)[:800]}\n```\n"
         f"👉 请查看 logs/app.log;环境类错误(网络/限流)恢复后重跑,代码类错误修复后重启调度。"
     )
