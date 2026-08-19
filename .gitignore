@@ -55,3 +55,6 @@ chroma_db/
 
 # pytest
 .pytest_cache/
+
+# CLAUDE.md — local-only project instructions (not published)
+CLAUDE.md
