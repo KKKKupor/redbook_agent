@@ -6,6 +6,7 @@ filter_notes 本地筛选排序(点赞热度可靠;一周内为尽力而为—�
 live 搜索见 search_notes(依赖 data/xhs_cookies.json)。
 """
 
+import asyncio
 import json
 import re
 from datetime import datetime, timedelta
@@ -129,3 +130,41 @@ def write_cache(keyword: str, notes: list) -> None:
     data[keyword] = {"scraped_at": datetime.now().isoformat(), "notes": notes}
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     CACHE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def search_notes(keyword: str, sort: str = "popularity_descending", max_results: int = 20) -> list:
+    """Playwright 实时搜索,返回 parse_notes 结果。失败抛异常(调用方降级)。"""
+    import asyncio
+    return asyncio.run(_search_async(keyword, sort, max_results))
+
+
+async def _search_async(keyword: str, sort: str, max_results: int) -> list:
+    from utils.xhs_auth import XHSBrowser
+    async with XHSBrowser(headless=True) as (browser, context, page):
+        url = SEARCH_URL.format(kw=keyword, sort=sort)
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await asyncio.sleep(2)
+        for _ in range(2):
+            await page.evaluate("window.scrollBy(0, 600)")
+            await asyncio.sleep(1)
+        text = await page.evaluate("() => document.body.innerText")
+    notes = parse_notes(text, max_results=max_results)
+    logger.info(f"xhs_search: '{keyword}' sort={sort} -> {len(notes)} notes")
+    return notes
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="小红书搜索(测试题关键词)")
+    ap.add_argument("keyword")
+    ap.add_argument("--sort", default="popularity_descending",
+                    choices=["general", "popularity_descending", "time_descending"])
+    ap.add_argument("--min-likes", type=int, default=0)
+    ap.add_argument("--days", type=int, default=None, help="时效上限(天,尽力而为:依赖页面时间标记)")
+    ap.add_argument("--top", type=int, default=10)
+    args = ap.parse_args()
+    notes = search_notes(args.keyword, sort=args.sort)
+    filtered = filter_notes(notes, min_likes=args.min_likes, max_age_days=args.days, top_n=args.top)
+    print(f"共抓取 {len(notes)} 条,筛选后 {len(filtered)} 条:")
+    for n in filtered:
+        print(f"  {n['likes_num']:>7}  {n['title']}  (原始: {n['likes']})")
