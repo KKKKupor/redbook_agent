@@ -216,7 +216,7 @@
 
 <div class="footer">仅供娱乐</div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 <script>
   // ═══ Data ═══
   const questions = {{ questions_json | safe }};
@@ -391,32 +391,34 @@
       normalized[dim] = Math.min(100, pct);
     });
 
-    // Radar chart
-    var ctx = document.getElementById('radarChart').getContext('2d');
-    if (radarChart) { radarChart.destroy(); }
-    var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-    radarChart = new Chart(ctx, {
-      type: 'radar',
-      data: {
-        labels: dimensionDefs.map(function(d) { return d.name; }),
-        datasets: [{
-          label: '你的得分',
-          data: dimensionDefs.map(function(d) { return normalized[d.id]; }),
-          backgroundColor: accent + '33',
-          borderColor: accent,
-          borderWidth: 2.5,
-          pointBackgroundColor: accent,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          tension: 0.2,
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 11 } } } },
-        plugins: { legend: { display: false } }
-      }
-    });
+    // Radar chart(CDN 挂起时 Chart 未定义,跳过图表,其余结果照常展示)
+    if (typeof Chart !== 'undefined') {
+      var ctx = document.getElementById('radarChart').getContext('2d');
+      if (radarChart) { radarChart.destroy(); }
+      var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+      radarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: dimensionDefs.map(function(d) { return d.name; }),
+          datasets: [{
+            label: '你的得分',
+            data: dimensionDefs.map(function(d) { return normalized[d.id]; }),
+            backgroundColor: accent + '33',
+            borderColor: accent,
+            borderWidth: 2.5,
+            pointBackgroundColor: accent,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            tension: 0.2,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 11 } } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
 
     // Personality badge — computed from highest dimension score
     var isMBTI = personalityMapping.classification_type === 'mbti';
