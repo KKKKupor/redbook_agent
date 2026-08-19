@@ -17,6 +17,14 @@ POOL_FILE = Path(__file__).resolve().parent.parent / "data" / "topic_pool.json"
 
 SEARCH_QUERIES = ["测试题", "人格测试", "心理测试", "性格测试"]
 
+DEFAULT_TOPIC_POOL = [
+    "人格阴影测试", "童年创伤程度测试", "恋爱人格匹配测试",
+    "危险人格类型测试", "职场性格测试", "MBTI深度解析",
+    "动物塑测试", "去性别化人格测试", "心理压力指数测试",
+    "情商测试", "社交人格测试", "抑郁倾向筛查",
+]
+MIN_TOPICS = 3  # 原为6,过严导致文件从未产出
+
 
 async def _scrape_topics() -> list:
     """Scrape trending topics from XHS search. Returns list of topic strings."""
@@ -51,15 +59,17 @@ def run_scrape():
     logger.info("Scraper: weekly topic refresh starting...")
     try:
         topics = asyncio.run(_scrape_topics())
-        if len(topics) >= 6:
+        if len(topics) >= MIN_TOPICS:
+            merged = topics + [t for t in DEFAULT_TOPIC_POOL if t not in set(topics)]
             data = {
                 "updated_at": datetime.now().isoformat(),
-                "topics": topics,
+                "topics": merged,
+                "scraped_count": len(topics),
             }
             POOL_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
             logger.info(f"Scraper: saved {len(topics)} topics -> {POOL_FILE}")
         else:
-            logger.warning(f"Scraper: only {len(topics)} topics (need >=6), keeping old pool")
+            logger.warning(f"Scraper: only {len(topics)} topics (need >= {MIN_TOPICS}), keeping old pool")
     except Exception as e:
         logger.error(f"Scraper: weekly run failed: {e}")
 
