@@ -16,7 +16,7 @@
 `insights.json` — 标题公式/关键词/卖点/视觉风格建议
 
 ## MVP临时变更
-- **无真实搜索**: MVP未接入Playwright搜索。所有分析基于LLM先验知识。
+- **真实搜索已接入(2026-08-19)**: 三级回退(缓存7天→Playwright live→LLM先验);cookies过期时自动走先验兜底
 - **恢复条件**: Playwright cookie可用的前提下，将真实搜索结果注入prompt。
 
 ## 2026-08-10 — prompt增强+JSON修复（已完成）
@@ -35,11 +35,9 @@
 ## 已知局限
 - **JSON解析不稳定**: DeepSeek偶发返回纯文本而非JSON，触发fallback默认值。已通过prompt格式约束增强+`_repair_json`兜底缓解。
 - **默认值固化**: fallback的关键词"性格/测试/人格"几乎每次相同。
-- **LLM先验知识可能过时**: DeepSeek训练数据截止时间不确定，可能与小红书当前热点脱节。
 
 ## 调优指南
 - ~~在 `main.py` 中添加 `_repair_json`~~（已添加）— 如仍解析失败，继续增强 `skills/system.md` 的格式约束
-- Playwright可用后，将搜索结果注入prompt
 - 更新 `skills/system.md` 添加更多分析维度
 
 ## 文件

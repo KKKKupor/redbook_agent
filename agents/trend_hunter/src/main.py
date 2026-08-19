@@ -75,10 +75,14 @@ def trend_hunter_node(state: dict) -> dict:
 
     logger.info(f"Trend Hunter: analyzing hot patterns for '{topic}'")
 
+    # 三级回退获取真实搜索数据(缓存→live→None),注入 prompt
+    notes = get_search_context(topic)
+    save("trend_hunter", "search_context.json", {"topic": topic, "notes": notes or []})
+
     try:
         response = llm.invoke([
             SystemMessage(content=HUNTER_SYSTEM_PROMPT),
-            HumanMessage(content=f"请分析小红书上关于「{topic}」类付费测试题的爆款结构公式。注意: 只输出JSON。"),
+            HumanMessage(content=build_human_message(topic, notes)),
         ])
         add_from_response("trend_hunter", response)
         save_prompt("trend_hunter", HUNTER_SYSTEM_PROMPT + f"\n\nTopic: {topic}")
@@ -99,3 +103,42 @@ def trend_hunter_node(state: dict) -> dict:
     save("trend_hunter", "insights.json", insights)
 
     return {"_trend_insights": insights}
+
+
+import tools.xhs_search as xhs_search
+
+
+def get_search_context(topic: str, max_results: int = 10) -> list | None:
+    """三级回退:缓存(7天内)→实时搜索(成功写缓存)→None(LLM先验兜底)。"""
+    cached = xhs_search.read_cache(topic)
+    if cached:
+        logger.info(f"Trend Hunter: cache hit for '{topic}' ({len(cached)} notes)")
+        return cached
+    try:
+        notes = xhs_search.search_notes(topic, sort="popularity_descending", max_results=max_results)
+        notes = xhs_search.filter_notes(notes, top_n=max_results)
+        if notes:
+            xhs_search.write_cache(topic, notes)
+            logger.info(f"Trend Hunter: live search '{topic}' -> {len(notes)} notes (cached)")
+            return notes
+    except Exception as e:
+        logger.warning(f"Trend Hunter: live search failed ({e}) — falling back to LLM prior")
+    return None
+
+
+def format_search_context(notes: list) -> str:
+    """格式化搜索结果供 prompt 使用,标注为推测性参考。"""
+    if not notes:
+        return ""
+    lines = ["以下为小红书搜索结果中的标题与点赞数(仅供推测性参考,非官方数据):"]
+    for n in notes:
+        lines.append(f"- {n['title']} (点赞 {n['likes']})")
+    return "\n".join(lines)
+
+
+def build_human_message(topic: str, notes: list | None) -> str:
+    """组装 human message:有真实数据时注入,无则仅用选题。"""
+    base = f"请分析小红书上关于「{topic}」类付费测试题的爆款结构公式。注意: 只输出JSON。"
+    if notes:
+        return f"{base}\n\n{format_search_context(notes)}"
+    return base
