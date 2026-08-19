@@ -35,7 +35,7 @@
   → Navigator 自助: 选题→维度→IP角色提取
   → Generator 生成题目
   → Packager 包装HTML+人格标签
-  → Publisher 自动部署Vercel
+  → Publisher 自动部署GitHub Pages
   → 钉钉回复链接
 
 钉钉 @bot "发小红书吧"
@@ -48,4 +48,4 @@ DingTalk outgoing webhook 恢复后即可使用：`python bot_server.py` + `ngro
 ## 已知局限
 - 搜索在中国网络下fallback到训练数据（DuckDuckGo被墙），非实时信息
 - IP角色提取依赖LLM训练数据覆盖面，冷门IP可能提取不全
-- **选题池文件缺失**: `main.py:73` 读取 `data/topic_pool.json`，但该文件当前不存在（`POOL_FILE.exists()` 判断失败），70/30轮转实际基于硬编码兜底话题。周一抓取任务（xhs_scraper）成功产出该文件后自动生效。
+- **选题池已真实产出(2026-08-19)**: `data/topic_pool.json` 由周一抓取任务(xhs_scraper)产出——真实抓取话题(已过滤噪音词与搜索词本身)在前、硬编码默认池去重补后。cookies 过期导致抓取 <3 条时不写文件,回落硬编码兜底。

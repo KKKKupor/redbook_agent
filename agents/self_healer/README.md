@@ -11,3 +11,6 @@
 ## 已知局限
 - 完全未实现。reason：MVP阶段错误直接通过loguru记录+console输出足够调试。
 - 递归深度锁、边界控制等安全机制待设计。
+
+## 2026-08-19 — 告警第一步已落地
+- 失败告警已实现:`utils/notifier.format_fatal_message` + main.py run_once except 推送 🚨 Fatal 钉钉告警(不吞异常)。Git留痕/AI诊断/沙盒验证仍为 V2 桩。

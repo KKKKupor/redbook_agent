@@ -10,6 +10,11 @@
 - **评分传参**: 计算并传递`max_score_per_question`给HTML模板
 - **Skill全面增强**: copy/style/analysis/personality四个skill全部重写
 
+## 2026-08-18 — 文案提取契约化修复
+- **问题**: 【首推版本】块LLM只输出版本名+推荐理由,旧启发式提取把"思考过程"当文案发进了钉钉素材消息
+- **修复**: copy.md 输出契约改为【首推版本】=完整复制所选文案、【推荐理由】=一句话理由;`_extract_recommended` 纯函数按契约提取(截断到下一【标记、去版本选择器行、校验≥20字+含话题标签),不合格回退 `FALLBACK_COPY`
+- **测试**: `tests/test_packager_copy.py` 6个TDD测试(含真实坏样本回归)
+
 ## MVP临时变更
 - 人格映射动态化（非强制MBTI）
 - 所有prompt用`.replace()`
