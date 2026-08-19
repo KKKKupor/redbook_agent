@@ -33,6 +33,8 @@ def run_once():
     from graph.workflow import get_app
 
     run_id = start_run()
+    from utils.health import reset as health_reset
+    health_reset()
     if REVIEW_MODE:
         logger.info(f"Review mode ON — outputs will be saved to output/{run_id}/")
 
@@ -146,12 +148,25 @@ def run_once():
 
     except Exception as e:
         logger.error(f"Workflow crashed: {e}")
+        # 错误分类 + REVIEW_MODE 下 Git 留痕(生产模式不自动提交,尊重红线)
+        from utils.health import classify_error
+        error_class = classify_error(e)
+        commit_hash = ""
+        if REVIEW_MODE:
+            try:
+                from utils.git_ops import git_ops
+                commit_hash = git_ops.auto_commit()
+            except Exception as ge:
+                logger.error(f"Auto-commit for healing failed: {ge}")
         # 致命错误告警:推送后照常抛出(不吞异常)
         try:
             from utils.notifier import notifier, format_fatal_message
+            content = format_fatal_message("daily_workflow", e)
+            content += f"\n🧪 错误分类: {error_class}"
+            content += f"\n🔐 Git留痕: {commit_hash[:12] if commit_hash else '未执行(REVIEW_MODE=false 或失败)'}"
             notifier.send(
                 title="🚨 小红书Agent组致命错误",
-                content=format_fatal_message("daily_workflow", e),
+                content=content,
                 level="fatal",
             )
         except Exception as ne:
