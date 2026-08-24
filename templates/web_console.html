@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>小红书 Agent 工作台</title>
+<style>
+:root {
+  --ground: #08090A;
+  --surface1: #16171C;
+  --surface2: #1E1F25;
+  --hairline: rgba(255, 255, 255, 0.06);
+  --text: #F7F8F8;
+  --secondary: #9CA3AF;
+  --muted: #6B7280;
+  --accent: #5E6AD2;
+  --stream: #A78BFA;
+  --green: #3FB950;
+  --red: #EF4444;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code",
+               Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- brand bar ---- */
+.brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--ground);
+}
+.brand-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.brand-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.status-dot.running {
+  background: var(--accent);
+  animation: pulse 1.2s ease-out infinite;
+  box-shadow: 0 0 6px rgba(94, 106, 210, 0.5);
+}
+
+/* ---- thread ---- */
+.thread {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 16px 16px;
+}
+.thread > * {
+  width: 100%;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.thread::-webkit-scrollbar { width: 10px; }
+.thread::-webkit-scrollbar-track { background: transparent; }
+.thread::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  border: 2px solid var(--ground);
+}
+.thread::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* ---- empty state ---- */
+.empty { text-align: center; padding: 64px 16px 40px; }
+.empty-title { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.empty-sub { margin-top: 6px; font-size: 13px; color: var(--muted); }
+.chips {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.chip {
+  background: var(--surface2);
+  color: var(--secondary);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 150ms ease-out, border-color 150ms ease-out;
+}
+.chip:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* ---- user message ---- */
+.msg-user { text-align: right; }
+.bubble-user {
+  display: inline-block;
+  text-align: left;
+  background: var(--surface1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  border-bottom-right-radius: 4px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+/* ---- round / agent cards ---- */
+.round { display: flex; flex-direction: column; gap: 10px; }
+
+.agent-card {
+  background: var(--surface1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 150ms ease-out;
+}
+.agent-card:hover { border-color: rgba(255, 255, 255, 0.1); }
+
+.agent-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+}
+.status-light {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+  transition: background-color 150ms ease-out;
+}
+.agent-card.running .status-light {
+  background: var(--accent);
+  animation: pulse 1.2s ease-out infinite;
+  box-shadow: 0 0 6px rgba(94, 106, 210, 0.5);
+}
+.agent-card.done .status-light { background: var(--green); }
+.agent-card.failed .status-light { background: var(--red); }
+
+.agent-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.agent-elapsed {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-stream {
+  display: none;
+  background: var(--surface2);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--stream);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.agent-card.has-stream .agent-stream { display: block; }
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -1px;
+  background: var(--stream);
+  animation: blink 1s step-end infinite;
+}
+
+/* ---- collapsible summary ---- */
+.summary { display: none; border-top: 1px solid var(--hairline); }
+.agent-card.done .summary { display: block; }
+.summary > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: color 150ms ease-out;
+}
+.summary > summary:hover { color: var(--text); }
+.summary > summary::-webkit-details-marker { display: none; }
+.summary > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--muted);
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  transition: transform 150ms ease-out;
+}
+.summary[open] > summary::before { transform: rotate(90deg); }
+.summary pre {
+  margin: 0;
+  padding: 0 14px 12px 25px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- step hint / error banner / result ---- */
+.step-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.step-hint::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #FCA5A5;
+  word-break: break-word;
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px;
+  font-size: 13px;
+}
+.result-label { color: var(--secondary); font-weight: 600; }
+.result-link { color: var(--accent); text-decoration: none; }
+.result-link:hover { text-decoration: underline; }
+.result-cost {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- input bar ---- */
+.input-bar {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline);
+  background: var(--ground);
+}
+#cmd {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  padding: 0 14px;
+  height: 40px;
+  outline: none;
+  transition: border-color 150ms ease-out;
+}
+#cmd::placeholder { color: var(--muted); }
+#cmd:focus { border-color: var(--accent); }
+#cmd:disabled { opacity: 0.55; }
+.send-btn {
+  flex: none;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 0 20px;
+  height: 40px;
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
+}
+.send-btn:hover:not(:disabled) { opacity: 0.9; }
+.send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- floating back-to-bottom ---- */
+.back-to-bottom {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 84px;
+  background: var(--surface1);
+  color: var(--secondary);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 14px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  z-index: 20;
+  transition: color 150ms ease-out;
+}
+.back-to-bottom:hover { color: var(--text); }
+.back-to-bottom[hidden] { display: none; }
+
+/* ---- toast ---- */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #FCA5A5;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 9px 16px;
+  font-size: 13px;
+  max-width: min(480px, calc(100vw - 32px));
+  z-index: 30;
+  transition: opacity 150ms ease-out;
+}
+.toast[hidden] { display: none; }
+
+/* ---- animations ---- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-card.running .status-light,
+  .status-dot.running { animation: none; }
+  .caret { animation: none; opacity: 0.6; }
+}
+
+/* ---- mobile ---- */
+@media (max-width: 480px) {
+  .brand { padding: 10px 14px; }
+  .thread { padding: 12px 10px; gap: 8px; }
+  .round { gap: 8px; }
+  .agent-head { padding: 8px 10px; }
+  .agent-stream { padding: 8px 10px; }
+  .summary > summary { padding: 7px 10px; }
+  .summary pre { padding: 0 10px 10px 21px; }
+  .input-bar { padding: 10px; }
+  .back-to-bottom { bottom: 76px; }
+  .empty { padding: 40px 12px 24px; }
+}
+</style>
+</head>
+<body>
+
+<header class="brand">
+  <div class="brand-title">小红书 Agent 工作台</div>
+  <div class="brand-status">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">就绪</span>
+  </div>
+</header>
+
+<main id="thread" class="thread" aria-live="polite">
+  <div id="empty" class="empty">
+    <p class="empty-title">输入指令,开始生成测试题</p>
+    <p class="empty-sub">点击示例指令,或直接输入:</p>
+    <div class="chips">
+      <button class="chip" data-fill="做一个人格阴影测试,15题">做一个人格阴影测试,15题</button>
+      <button class="chip" data-fill="做一个恋爱人格测试">做一个恋爱人格测试</button>
+      <button class="chip" data-fill="做一个MBTI职场测试,20题">做一个MBTI职场测试,20题</button>
+    </div>
+  </div>
+</main>
+
+<button id="backToBottom" class="back-to-bottom" hidden>回到底部</button>
+
+<footer class="input-bar">
+  <input id="cmd" type="text" placeholder="输入指令,例如:做一个人格阴影测试,15题" autocomplete="off">
+  <button id="send" class="send-btn">生成</button>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var thread = document.getElementById("thread");
+  var cmd = document.getElementById("cmd");
+  var sendBtn = document.getElementById("send");
+  var backBtn = document.getElementById("backToBottom");
+  var statusDot = document.getElementById("statusDot");
+  var statusText = document.getElementById("statusText");
+  var toastEl = document.getElementById("toast");
+
+  var AGENTS = [
+    { key: "navigator", label: "领航员 Navigator" },
+    { key: "generator", label: "生成器 Generator" },
+    { key: "packager", label: "包装师 Packager" },
+    { key: "publisher", label: "发布器 Publisher" }
+  ];
+
+  var running = false;
+  var cards = {};        // agent key -> {card, stream, textNode, caret, details, pre, elapsed}
+  var lastCard = null;   // element of the most recently started agent
+  var startedAt = {};    // agent key -> timestamp
+  var timer = null;
+
+  /* ---------- helpers ---------- */
+
+  function fmtElapsed(ms) {
+    var s = Math.floor(ms / 1000);
+    if (s < 60) return s + "s";
+    return Math.floor(s / 60) + "m " + (s % 60) + "s";
+  }
+
+  function nearBottom() {
+    return thread.scrollHeight - thread.scrollTop - thread.clientHeight <= 120;
+  }
+
+  function autoScroll() {
+    if (nearBottom()) thread.scrollTop = thread.scrollHeight;
+  }
+
+  thread.addEventListener("scroll", function () {
+    backBtn.hidden = nearBottom();
+  });
+
+  backBtn.addEventListener("click", function () {
+    thread.scrollTop = thread.scrollHeight;
+  });
+
+  var toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    toastEl.style.opacity = "1";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toastEl.style.opacity = "0";
+      setTimeout(function () { toastEl.hidden = true; }, 160);
+    }, 4200);
+  }
+
+  function setBusy(b) {
+    running = b;
+    sendBtn.disabled = b;
+    cmd.disabled = b;
+    if (b) {
+      statusDot.classList.add("running");
+      statusText.textContent = "生成中";
+    } else {
+      statusDot.classList.remove("running");
+      statusText.textContent = "就绪";
+    }
+  }
+
+  /* ---------- rendering ---------- */
+
+  function hideEmpty() {
+    var e = document.getElementById("empty");
+    if (e) e.remove();
+  }
+
+  function renderUserBubble(text) {
+    hideEmpty();
+    var wrap = document.createElement("div");
+    wrap.className = "msg-user";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble-user";
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+  }
+
+  function renderRound() {
+    var round = document.createElement("div");
+    round.className = "round";
+    cards = {};
+    lastCard = null;
+    startedAt = {};
+    AGENTS.forEach(function (a) {
+      var card = document.createElement("div");
+      card.className = "agent-card waiting";
+      card.dataset.agent = a.key;
+
+      var head = document.createElement("div");
+      head.className = "agent-head";
+      var light = document.createElement("span");
+      light.className = "status-light";
+      var name = document.createElement("span");
+      name.className = "agent-name";
+      name.textContent = a.label;
+      var elapsed = document.createElement("span");
+      elapsed.className = "agent-elapsed";
+      elapsed.textContent = "—";
+      head.appendChild(light);
+      head.appendChild(name);
+      head.appendChild(elapsed);
+
+      var stream = document.createElement("div");
+      stream.className = "agent-stream";
+      var textNode = document.createTextNode("");
+      stream.appendChild(textNode);
+
+      var details = document.createElement("details");
+      details.className = "summary";
+      var sum = document.createElement("summary");
+      sum.textContent = "结果摘要";
+      var pre = document.createElement("pre");
+      details.appendChild(sum);
+      details.appendChild(pre);
+
+      card.appendChild(head);
+      card.appendChild(stream);
+      card.appendChild(details);
+      round.appendChild(card);
+
+      cards[a.key] = { card: card, stream: stream, textNode: textNode, caret: null, details: details, pre: pre, elapsed: elapsed };
+    });
+    thread.appendChild(round);
+  }
+
+  /* ---------- agent lifecycle ---------- */
+
+  function startTimer() {
+    if (timer) return;
+    timer = setInterval(function () {
+      var anyRunning = false;
+      for (var key in cards) {
+        var c = cards[key];
+        if (c.card.classList.contains("running")) {
+          anyRunning = true;
+          c.elapsed.textContent = fmtElapsed(Date.now() - (startedAt[key] || Date.now()));
+        }
+      }
+      if (!anyRunning) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }, 500);
+  }
+
+  function activate(agent) {
+    var c = cards[agent];
+    if (!c) return;
+    lastCard = c.card;
+    c.card.classList.remove("waiting");
+    c.card.classList.add("running");
+    c.card.classList.add("has-stream");
+    startedAt[agent] = Date.now();
+    c.elapsed.textContent = "0s";
+    if (!c.caret) {
+      var caret = document.createElement("span");
+      caret.className = "caret";
+      c.stream.appendChild(caret);
+      c.caret = caret;
+    }
+    startTimer();
+    autoScroll();
+  }
+
+  function appendToken(agent, text) {
+    var c = cards[agent];
+    if (!c || !text) return;
+    c.card.classList.add("has-stream");
+    c.textNode.data += text;
+    autoScroll();
+  }
+
+  function finish(agent, summary) {
+    var c = cards[agent];
+    if (!c) return;
+    c.card.classList.remove("running");
+    c.card.classList.add("done");
+    c.elapsed.textContent = fmtElapsed(Date.now() - (startedAt[agent] || Date.now()));
+    if (c.caret) { c.caret.remove(); c.caret = null; }
+    if (summary && Object.keys(summary).length > 0) {
+      c.pre.textContent = JSON.stringify(summary, null, 2);
+    }
+    autoScroll();
+  }
+
+  function failCard(c) {
+    if (!c) return;
+    c.card.classList.remove("running");
+    c.card.classList.add("failed");
+    if (c.caret) { c.caret.remove(); c.caret = null; }
+    c.elapsed.textContent = "—";
+  }
+
+  function addStep(message) {
+    var row = document.createElement("div");
+    row.className = "step-hint";
+    var span = document.createElement("span");
+    span.textContent = message || "";
+    row.appendChild(span);
+    if (lastCard && lastCard.parentNode) {
+      lastCard.parentNode.insertBefore(row, lastCard.nextSibling);
+    } else {
+      thread.appendChild(row);
+    }
+    autoScroll();
+  }
+
+  function showError(message) {
+    var banner = document.createElement("div");
+    banner.className = "error-banner";
+    banner.textContent = message || "生成失败";
+    if (lastCard && lastCard.parentNode) {
+      lastCard.parentNode.insertBefore(banner, lastCard.nextSibling);
+    } else {
+      thread.appendChild(banner);
+    }
+    autoScroll();
+  }
+
+  function midStreamError(message) {
+    var c = lastCard ? cards[lastCard.dataset.agent] : null;
+    if (c) failCard(c);
+    showError(message);
+    setBusy(false);
+  }
+
+  function roundFailed(message) {
+    var round = thread.querySelector(".round");
+    if (round) round.remove();
+    showToast(message);
+    setBusy(false);
+  }
+
+  function finishRound(url, cost) {
+    var row = document.createElement("div");
+    row.className = "result-row";
+    var label = document.createElement("span");
+    label.className = "result-label";
+    label.textContent = "完成";
+    row.appendChild(label);
+    if (url) {
+      var link = document.createElement("a");
+      link.className = "result-link";
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "查看生成结果";
+      row.appendChild(link);
+    } else {
+      var none = document.createElement("span");
+      none.className = "result-link";
+      none.textContent = "未获取到链接";
+      row.appendChild(none);
+    }
+    var costSpan = document.createElement("span");
+    costSpan.className = "result-cost";
+    costSpan.textContent = "成本 ¥" + Number(cost || 0).toFixed(4);
+    row.appendChild(costSpan);
+    thread.appendChild(row);
+    setBusy(false);
+    autoScroll();
+  }
+
+  /* ---------- SSE ---------- */
+
+  function dispatch(frame) {
+    var lines = frame.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.indexOf("data:") !== 0) continue;
+      var payload = line.slice(5).trim();
+      if (!payload) continue;
+      var ev;
+      try { ev = JSON.parse(payload); } catch (e) { continue; }
+      switch (ev.event) {
+        case "agent_start": activate(ev.agent); break;
+        case "token": appendToken(ev.agent, ev.text); break;
+        case "agent_done": finish(ev.agent, ev.summary); break;
+        case "step": addStep(ev.message); break;
+        case "done": finishRound(ev.url, ev.cost); break;
+        case "error": midStreamError(ev.message); break;
+      }
+    }
+  }
+
+  async function consumeStream(body) {
+    var reader = body.getReader();
+    var decoder = new TextDecoder();
+    var buf = "";
+    for (;;) {
+      var res = await reader.read();
+      if (res.done) break;
+      buf += decoder.decode(res.value, { stream: true });
+      var idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        var frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        dispatch(frame);
+      }
+    }
+  }
+
+  /* ---------- send ---------- */
+
+  async function send() {
+    var text = cmd.value.trim();
+    if (!text || running) return;
+    renderUserBubble(text);
+    renderRound();
+    setBusy(true);
+    cmd.value = "";
+    try {
+      var res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+      if (!res.ok) {
+        // 429/400 等错误以 JSON 返回(非 SSE)
+        var msg = "请求失败 (" + res.status + ")";
+        try {
+          var data = await res.json();
+          if (data && data.error) msg = data.error;
+        } catch (e) { /* keep default */ }
+        roundFailed(msg);
+        return;
+      }
+      await consumeStream(res.body);
+      setBusy(false);
+    } catch (err) {
+      roundFailed("网络错误:无法连接服务器");
+    }
+  }
+
+  cmd.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") send();
+  });
+  sendBtn.addEventListener("click", send);
+
+  document.querySelectorAll(".chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      cmd.value = chip.dataset.fill || chip.textContent;
+      cmd.focus();
+    });
+  });
+
+  backBtn.hidden = true;
+})();
+</script>
+</body>
+</html>
