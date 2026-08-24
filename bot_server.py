@@ -6,7 +6,7 @@ Expose: ngrok http 8080
 Configure DingTalk outgoing webhook → ngrok_url/dingtalk/webhook
 """
 
-import json, re, os, sys, asyncio, subprocess
+import json, os, sys, asyncio, subprocess
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -21,34 +21,12 @@ from agents.navigator.src.main import navigator_node
 from agents.generator.src.main import generator_node
 from agents.packager.src.main import packager_node
 from utils.token_tracker import add_from_response, summary as token_summary, reset as token_reset
+from utils.command_parser import parse_command
 
 app = FastAPI()
 
 DINGTALK_URL = os.getenv("DINGTALK_WEBHOOK_URL", "")
 REVIEW_MODE = os.getenv("REVIEW_MODE", "false").lower() == "true"
-
-
-def parse_command(text: str) -> dict:
-    """Parse user message — detects both 'generate' and 'coordinate' commands."""
-    text = re.sub(r'@\S+', '', text).strip()
-
-    # Coordination commands (Navigator handles these)
-    if any(kw in text for kw in ["发小红书", "发布", "上传", "publish"]):
-        return {"type": "publish", "text": text}
-    if any(kw in text for kw in ["重新生成", "重做", "再来", "redo", "regenerate"]):
-        return {"type": "regenerate", "text": text}
-    if any(kw in text for kw in ["改", "调整", "换成"]):
-        count_match = re.search(r'(\d+)\s*题', text)
-        return {"type": "modify", "text": text, "new_count": int(count_match.group(1)) if count_match else None}
-    if any(kw in text for kw in ["挺好", "不错", "可以", "ok", "行", "好"]):
-        return {"type": "approve_publish", "text": text}
-
-    # Generate command
-    topic_match = re.search(r'(?:关于|做.*?|想要.*?|要.*?)(.+?)(?:的测试|测试题|测试|$)', text)
-    topic = topic_match.group(1).strip() if topic_match else text[:30]
-    count_match = re.search(r'(\d+)\s*题', text)
-    count = int(count_match.group(1)) if count_match else 15
-    return {"type": "generate", "text": text, "topic": topic, "question_count": min(count, 100)}
 
 
 def send_dingtalk(title: str, content: str):
