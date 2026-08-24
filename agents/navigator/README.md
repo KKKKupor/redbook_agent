@@ -45,6 +45,8 @@
 不需要手动脚本。`bot_server.py` 中 `generate_test()` 函数已内置自动调 Publisher。
 DingTalk outgoing webhook 恢复后即可使用：`python bot_server.py` + `ngrok http 8080`。
 
+Web 控制台: `python web_console.py` → http://localhost:8090/ 发指令即可流式生成(每IP每日1次)
+
 ## 已知局限
 - 搜索在中国网络下fallback到训练数据（DuckDuckGo被墙），非实时信息
 - IP角色提取依赖LLM训练数据覆盖面，冷门IP可能提取不全
