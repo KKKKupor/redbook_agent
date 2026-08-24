@@ -461,6 +461,7 @@ body {
   ];
 
   var running = false;
+  var stopped = false;   // round terminated (done/error/failed); later frames are ignored
   var cards = {};        // agent key -> {card, stream, textNode, caret, details, pre, elapsed}
   var lastCard = null;   // element of the most recently started agent
   var startedAt = {};    // agent key -> timestamp
@@ -676,6 +677,7 @@ body {
   }
 
   function midStreamError(message) {
+    stopped = true;
     var c = lastCard ? cards[lastCard.dataset.agent] : null;
     if (c) failCard(c);
     showError(message);
@@ -683,13 +685,25 @@ body {
   }
 
   function roundFailed(message) {
+    stopped = true;
     var round = thread.querySelector(".round");
     if (round) round.remove();
     showToast(message);
     setBusy(false);
   }
 
+  function safeUrl(raw) {
+    if (!raw) return "";
+    try {
+      var u = new URL(raw, window.location.href);
+      if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+    } catch (e) { /* fall through */ }
+    return "";
+  }
+
   function finishRound(url, cost) {
+    stopped = true;
+    url = safeUrl(url);   // 只允许 http/https,否则走无链接分支
     var row = document.createElement("div");
     row.className = "result-row";
     var label = document.createElement("span");
@@ -722,6 +736,7 @@ body {
   /* ---------- SSE ---------- */
 
   function dispatch(frame) {
+    if (stopped) return false;   // 终止后的迟到帧一律忽略
     var lines = frame.split("\n");
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
@@ -735,26 +750,43 @@ body {
         case "token": appendToken(ev.agent, ev.text); break;
         case "agent_done": finish(ev.agent, ev.summary); break;
         case "step": addStep(ev.message); break;
-        case "done": finishRound(ev.url, ev.cost); break;
-        case "error": midStreamError(ev.message); break;
+        case "done": finishRound(ev.url, ev.cost); return true;
+        case "error": midStreamError(ev.message); return true;
       }
     }
+    return false;
   }
 
   async function consumeStream(body) {
     var reader = body.getReader();
     var decoder = new TextDecoder();
     var buf = "";
+    var terminal = false;   // 已看到 done 或 error 帧
+    var res;
     for (;;) {
-      var res = await reader.read();
+      res = await reader.read();
       if (res.done) break;
-      buf += decoder.decode(res.value, { stream: true });
+      buf += decoder.decode(res.value, { stream: true }).replace(/\r\n/g, "\n");
       var idx;
       while ((idx = buf.indexOf("\n\n")) !== -1) {
         var frame = buf.slice(0, idx);
         buf = buf.slice(idx + 2);
-        dispatch(frame);
+        terminal = dispatch(frame) || terminal;
+        if (stopped) {
+          try { reader.cancel(); } catch (e) { /* 流已死,忽略 */ }
+          break;
+        }
       }
+      if (stopped) break;
+    }
+    if (res.done && buf.trim()) {
+      // 最后一段没有 \n\n 结尾的残留帧
+      buf = buf.replace(/\r\n/g, "\n");
+      terminal = dispatch(buf) || terminal;
+    }
+    if (!terminal && !stopped) {
+      // 流正常关闭但没有终止帧:中止本轮,不许残留 running 状态
+      midStreamError("连接提前结束");
     }
   }
 
@@ -763,6 +795,7 @@ body {
   async function send() {
     var text = cmd.value.trim();
     if (!text || running) return;
+    stopped = false;   // 新回合开始
     renderUserBubble(text);
     renderRound();
     setBusy(true);
@@ -786,7 +819,8 @@ body {
       await consumeStream(res.body);
       setBusy(false);
     } catch (err) {
-      roundFailed("网络错误:无法连接服务器");
+      // 流中途断开:保留已流式呈现的内容,红牌 + 错误条
+      midStreamError("网络错误:连接已断开");
     }
   }
 
