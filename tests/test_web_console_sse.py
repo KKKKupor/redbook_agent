@@ -48,7 +48,8 @@ class TestGenerateStream:
         agents["generator"] = boom
         events = _frames(generate_stream(cmd, "test-ip", agents=agents))
         assert events[-1]["event"] == "error"
-        assert "模拟失败" in events[-1]["message"]
+        assert "生成失败" in events[-1]["message"]
+        assert "模拟失败" not in events[-1]["message"]  # 内部异常细节不外泄
 
 
 class TestGenerateStreamThreadpool:

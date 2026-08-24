@@ -4,7 +4,6 @@ contextvar 保证同一请求线程内可见;无消费者时 emit 为 no-op(日�
 """
 
 from contextvars import ContextVar, Token
-from typing import Optional
 
 from loguru import logger
 

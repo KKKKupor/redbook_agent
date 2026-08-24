@@ -33,6 +33,55 @@ from tools.sales_tools import (
 
 NAVIGATOR_SYSTEM_PROMPT = load_skill(__file__, "system")
 
+GENERATED_FILE = Path(__file__).resolve().parent.parent.parent.parent / "data" / "generated_topics.json"
+
+
+def select_topic(user_topic: str | None, pool: list, generated: set, roll: float) -> dict:
+    """选题决策(纯函数):用户选题优先;否则从池中 70/30 轮转且不重复已生成过的选题。
+
+    roll <= 0.7 → exploit(池第一个未生成过的话题);否则 explore(其余随机)。
+    池中全部已生成 → 重置历史,从完整池重新开始。
+    返回 {"strategy", "topic", "generated"} — generated 为更新后的集合(池选题才记录)。
+    """
+    if user_topic:
+        return {"strategy": "user", "topic": user_topic, "generated": generated}
+
+    remaining = [t for t in pool if t not in generated]
+    if not remaining:
+        generated = set()
+        remaining = list(pool)
+        note("navigator", "pool_cycle_reset", "选题池全部已生成过,重置历史重新循环")
+    if roll <= 0.7:
+        topic = remaining[0]
+        strategy = "exploit"
+    else:
+        topic = random.choice(remaining[1:]) if len(remaining) > 1 else remaining[0]
+        strategy = "explore"
+    generated = generated | {topic}
+    return {"strategy": strategy, "topic": topic, "generated": generated}
+
+
+def _load_generated() -> set:
+    """加载已生成选题集合(generated_topics.json);缺失/损坏/非列表 → 空集。"""
+    try:
+        if GENERATED_FILE.exists():
+            data = json.loads(GENERATED_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                return set(data)
+    except Exception:
+        pass
+    return set()
+
+
+def _save_generated(generated: set) -> None:
+    """持久化已生成选题集合(仅池选题记录;data/ 不提交 Git)。失败仅告警,不阻断流程。"""
+    try:
+        GENERATED_FILE.parent.mkdir(parents=True, exist_ok=True)
+        GENERATED_FILE.write_text(json.dumps(sorted(generated), ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"navigator: 保存 generated_topics 失败: {e}")
+
+
 def _calculate_jitter() -> int:
     """Generate random jitter in ±PUBLISH_JITTER_MINUTES range."""
     max_jitter = int(os.getenv("PUBLISH_JITTER_MINUTES", "30"))
@@ -92,15 +141,13 @@ def navigator_node(state: dict) -> dict:
     if not pool_loaded:
         note("navigator", "topic_pool_hardcoded", "data/topic_pool.json 缺失或不足,使用硬编码话题池")
 
-    import random as _random
-    roll = _random.random()
-    strategy = "exploit" if roll <= 0.7 else "explore"
-
-    if strategy == "exploit":
-        selected_topic_name = REAL_TOPIC_POOL[0]
-    else:
-        available = REAL_TOPIC_POOL[1:]  # skip first for explore
-        selected_topic_name = _random.choice(available)
+    # ═══ 选题决策: 用户选题优先;否则池 70/30 轮转且不重复已生成选题 ═══
+    user_topic = state.get("selected_topic") or None  # 仅非空视为用户选题
+    sel = select_topic(user_topic, REAL_TOPIC_POOL, _load_generated(), random.random())
+    if sel["strategy"] != "user":
+        _save_generated(sel["generated"])
+    selected_topic_name = sel["topic"]
+    strategy = sel["strategy"]
 
     logger.info(f"Topic selection: strategy={strategy}, topic={selected_topic_name}")
 

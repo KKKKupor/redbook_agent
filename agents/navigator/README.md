@@ -5,7 +5,7 @@
 **模型**: DeepSeek-Chat  
 
 ## 职责
-- **选题决策**: 代码层70/30利用-探索轮转
+- **选题决策**: 用户选题优先(web控制台/钉钉/quick_test);无选题时代码层70/30轮转,池选题不重复(data/generated_topics.json 跨运行记录,耗尽自动重置循环)
 - **维度规划**: LLM动态生成3-12维
 - **IP角色提取**: 自动识别IP测试→从训练数据提取角色信息→输出`ip_roles`+`ip_info`
 - **定价**: 薄利多销¥0.99-1.99
@@ -21,6 +21,11 @@
 | `get_competitor_trend` | ✅ | 竞品分析(mock) |
 | `time_series_forecast` | ✅ | 发布时间预测(mock) |
 | `get_topic_diversity` | ✅ | 题材分布 |
+
+## 2026-08-24 变更
+- **用户选题优先**: `state.selected_topic` 非空(web控制台/钉钉/quick_test 传入)时直接采用,策略标记 `user`,不写入 generated 历史
+- **池选题不重复**: 无用户选题时从 `data/topic_pool.json` 70/30 轮转,已生成过的选题写入 `data/generated_topics.json`(跨运行持久化,data/ 不提交 Git);池耗尽自动重置历史重新循环并记录 health note `pool_cycle_reset`
+- **实现**: `select_topic` 纯函数 + `_load_generated`/`_save_generated`(缺失/损坏文件回空集);测试 `tests/test_navigator_topic.py` 覆盖四分支(用户优先/exploit/explore/循环重置)
 
 ## 2026-08-10 变更
 - **IP自主识别**: 不再在quick_test中硬编码IP关键词。Navigator自行判断选题是否为IP测试，从训练数据提取角色信息，输出`ip_roles`和`ip_info`传给Packager

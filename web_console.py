@@ -5,9 +5,7 @@
 """
 
 import json
-import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -67,13 +65,13 @@ async def index():
 @app.post("/api/generate")
 async def generate(request: Request):
     ip = _client_ip(request)
-    if not LIMIT.allow(ip):
-        return JSONResponse({"error": "今日生成次数已用完,明天再来吧"}, status_code=429)
     if ip in _running:
         return JSONResponse({"error": "已有生成进行中,请稍候"}, status_code=429)
     try:
         body = await request.json()
     except Exception:
+        return JSONResponse({"error": "请求格式错误"}, status_code=400)
+    if not isinstance(body, dict):
         return JSONResponse({"error": "请求格式错误"}, status_code=400)
     message = (body.get("message") or "").strip()
     if not message:
@@ -82,6 +80,10 @@ async def generate(request: Request):
     cmd = parse_command(message)
     if cmd["type"] != "generate":
         return JSONResponse({"error": "当前仅支持生成指令,例如「做一个人格阴影测试,15题」"}, status_code=400)
+
+    # 限额放行放在全部校验之后:400 请求不消耗当日配额
+    if not LIMIT.allow(ip):
+        return JSONResponse({"error": "今日生成次数已用完,明天再来吧"}, status_code=429)
 
     return StreamingResponse(
         generate_stream(cmd, ip),
@@ -161,8 +163,9 @@ def generate_stream(cmd: dict, ip: str, agents: dict | None = None):
         yield _sse({"event": "done", "url": url, "cost": round(cost, 4)})
 
     except Exception as e:
+        # 服务端日志保留完整细节;SSE 帧对外屏蔽内部异常信息
         logger.error(f"Web console generation failed: {e}")
-        yield _sse({"event": "error", "message": f"{type(e).__name__}: {str(e)[:300]}"})
+        yield _sse({"event": "error", "message": "生成失败,请稍后再试"})
     finally:
         _running.discard(ip)
 

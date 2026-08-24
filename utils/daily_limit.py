@@ -19,7 +19,11 @@ class DailyLimit:
     def _load(self) -> dict:
         if self.path.exists():
             try:
-                return json.loads(self.path.read_text(encoding="utf-8"))
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    logger.warning(f"daily_limit: 限额文件格式异常(非对象),重新开始: {self.path}")
+                    return {}
+                return data
             except Exception:
                 logger.warning(f"daily_limit: 限额文件损坏,重新开始: {self.path}")
         return {}
