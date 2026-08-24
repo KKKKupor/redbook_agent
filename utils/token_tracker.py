@@ -33,6 +33,11 @@ def add_from_response(agent: str, response):
         usage = response.response_metadata.get("token_usage", {})
         inp = usage.get("prompt_tokens", 0)
         out = usage.get("completion_tokens", 0)
+        if not (inp or out):
+            # streaming=True 时 usage 在 usage_metadata 而非 response_metadata.token_usage
+            um = response.usage_metadata or {}
+            inp = um.get("input_tokens", 0)
+            out = um.get("output_tokens", 0)
         if inp or out:
             add(agent, inp, out)
     except Exception:
