@@ -24,6 +24,11 @@ import uvicorn
 
 load_dotenv()
 
+# web 控制台默认自托管测试页(不依赖 github.io 公网可达性);
+# .env 显式设置优先(如服务器上 PUBLIC_BASE_URL=http://62.234.164.182:8090)
+os.environ.setdefault("DEPLOY_MODE", "static")
+os.environ.setdefault("PUBLIC_BASE_URL", "http://localhost:8090")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from utils.command_parser import parse_command
@@ -36,7 +41,7 @@ TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "web_console.htm
 # 静态托管生成的测试页与封面图(/quiz/...)— 素材图本地加载,不依赖 github.io 可达性
 DEPLOY_DIR = Path(__file__).resolve().parent / "output" / "deploy"
 DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/quiz", StaticFiles(directory=str(DEPLOY_DIR)), name="quiz")
+app.mount("/quiz", StaticFiles(directory=str(DEPLOY_DIR), html=True), name="quiz")
 # 白名单 = 回环(本机测试)∪ env 配置;白名单 IP 不限次、不消耗配额
 LIMIT = DailyLimit(
     Path(__file__).resolve().parent / "data" / "rate_limit.json",
