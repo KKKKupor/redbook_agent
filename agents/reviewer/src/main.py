@@ -113,6 +113,13 @@ def reviewer_node(state: dict) -> dict:
     # Build review payload — sample key content to avoid token overflow
     sample_qs = questions[:3] + questions[-2:] if len(questions) > 5 else questions
 
+    # 结果标签数据(packager 产出):评审员据此检查"结果标签是否切题"
+    personality = state.get("_personality_data") or {}
+    if not personality:
+        # 兼容:packager 未返回时尝试从 HTML 缺失,标记为未提供
+        personality = {}
+    style = state.get("style") or {}
+
     review_payload = f"""## 测试题产品评审
 
 ### 选题
@@ -123,6 +130,12 @@ def reviewer_node(state: dict) -> dict:
 
 ### 种草文案
 {copy_text[:2000]}
+
+### 结果标签（用户测完看到的标签,必须与选题语义同域）
+{json.dumps({k: personality.get(k) for k in ("classification_type", "primary_tag", "tag_name", "possible_tags")}, ensure_ascii=False, indent=2)[:1200] if personality else "未提供(包装环节缺失)"}
+
+### 视觉风格摘要
+{json.dumps({k: style.get(k) for k in ("theme", "accent_color", "icon_emoji")}, ensure_ascii=False, indent=2)[:500] if style else "未提供"}
 
 ### HTML长度
 {len(generated_html)} 字符

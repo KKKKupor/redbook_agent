@@ -293,4 +293,5 @@ def packager_node(state: dict) -> dict:
         "html_url": f"output/{filename}",
         "_analysis_data": analysis,
         "_personality_data": personality,
+        "style": style,
     }

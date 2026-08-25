@@ -152,43 +152,166 @@ def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Ev
     if stop_event.is_set():
         return
 
-    # ═══ 评审闭环: generator → packager → reviewer,评分不达标按修复意见重做(最多2次)═══
+    # ═══ 评审闭环: generator → packager → reviewer;不达标时按 fixes_needed 定向修复(最多2次)═══
+    # 定向修复复用 fix_issues 的 fix_* 函数(内存 state,只改评审点名的部分,不从头生成)
+    from fix_issues import (
+        fix_analysis_dim, fix_copy, fix_personality, fix_question, fix_style, re_render,
+    )
+    from utils.llm_factory import generator_llm, packager_llm as _fix_packager_llm
+
     review_retry_count = 0
     review_fixes_needed: list = []
-    for attempt in range(1 + MAX_REVIEW_RETRIES):
-        q.put({"event": "agent_start", "agent": "generator", "name": AGENTS["generator"]})
-        gen = agents["generator"]({
-            "selected_topic": effective_topic,
-            "target_question_count": count,
-            "dimension_defs": nav.get("dimension_defs", []),
-            "review_retry_count": review_retry_count,
-            "review_fixes_needed": review_fixes_needed,
-        })
-        q_count = len(gen.get("questions_json", {}).get("questions", []))
-        q.put({"event": "agent_done", "agent": "generator", "summary": {"题目数": q_count}})
-        if stop_event.is_set():
-            return
+    need_full_redo = False
+    pkg: dict = {}
+    q_count = 0
+    fix_state: dict = {}
 
-        q.put({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
-        pkg = agents["packager"]({
-            "selected_topic": effective_topic,
-            "target_question_count": count,
-            "suggested_price": 1.99,
-            "dimension_defs": nav.get("dimension_defs", []),
-            "questions_json": gen.get("questions_json", {}),
-        })
-        q.put({"event": "agent_done", "agent": "packager",
-               "summary": {"文案": (pkg.get("packaging_text") or "")[:60]}})
-        if stop_event.is_set():
-            return
+    def build_fix_state() -> dict:
+        return {
+            "questions_json": {
+                "topic": effective_topic,
+                "total_questions": q_count,
+                "questions": list(gen.get("questions_json", {}).get("questions", [])),
+            },
+            "dimension_defs": list(nav.get("dimension_defs", [])),
+            "style": dict(pkg.get("style") or {}),
+            "analysis": list(pkg.get("_analysis_data") or []),
+            "personality": dict(pkg.get("_personality_data") or {}),
+            "copy_text": pkg.get("packaging_text") or "",
+        }
+
+    def apply_targeted_fixes(state: dict, fixes: list):
+        """按 fixes 的 section 定向修复;返回 (need_full_redo, desc)。"""
+        need_full = False
+        desc = []
+        for fix in fixes or []:
+            section = (fix.get("section") or "").strip()
+            try:
+                if section == "personality":
+                    state["personality"] = fix_personality(state, _fix_packager_llm())
+                    desc.append("结果标签")
+                elif section == "copy":
+                    state["copy_text"] = fix_copy(state, _fix_packager_llm())
+                    desc.append("文案")
+                elif section in ("visual_style", "style"):
+                    state["style"] = fix_style(state, _fix_packager_llm())
+                    desc.append("视觉风格")
+                elif section == "analysis":
+                    dim_id = fix.get("dim_id")
+                    if not dim_id:
+                        need_full = True
+                        continue
+                    new_dim = fix_analysis_dim(state, dim_id, _fix_packager_llm())
+                    if not new_dim:
+                        need_full = True
+                        continue
+                    state["analysis"] = [d for d in state["analysis"] if d.get("dim_id") != dim_id] + [new_dim]
+                    desc.append(f"维度{dim_id}分析")
+                elif section == "questions":
+                    qid = fix.get("question_id")
+                    if not qid:
+                        need_full = True
+                        continue
+                    new_q = fix_question(state, qid, fix.get("issue", ""), fix.get("action", ""), generator_llm())
+                    if not new_q:
+                        need_full = True
+                        continue
+                    state["questions_json"]["questions"] = [
+                        new_q if x.get("id") == qid else x for x in state["questions_json"]["questions"]
+                    ]
+                    desc.append(f"第{qid}题")
+                else:
+                    # 未知 section(如 "all"):定向修不了 → 全量重做
+                    need_full = True
+            except Exception as e:
+                logger.warning(f"web console targeted fix failed ({section}): {e}")
+                need_full = True
+        return need_full, desc
+
+    for attempt in range(1 + MAX_REVIEW_RETRIES):
+        if attempt == 0 or need_full_redo:
+            # ── 全量生成(首轮,或定向修复无法覆盖时回退)──
+            q.put({"event": "agent_start", "agent": "generator", "name": AGENTS["generator"]})
+            gen = agents["generator"]({
+                "selected_topic": effective_topic,
+                "target_question_count": count,
+                "dimension_defs": nav.get("dimension_defs", []),
+                "review_retry_count": review_retry_count,
+                "review_fixes_needed": review_fixes_needed,
+            })
+            q_count = len(gen.get("questions_json", {}).get("questions", []))
+            q.put({"event": "agent_done", "agent": "generator", "summary": {"题目数": q_count}})
+            if stop_event.is_set():
+                return
+
+            q.put({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
+            pkg = agents["packager"]({
+                "selected_topic": effective_topic,
+                "target_question_count": count,
+                "suggested_price": 1.99,
+                "dimension_defs": nav.get("dimension_defs", []),
+                "questions_json": gen.get("questions_json", {}),
+            })
+            q.put({"event": "agent_done", "agent": "packager",
+                   "summary": {"文案": (pkg.get("packaging_text") or "")[:60]}})
+            if stop_event.is_set():
+                return
+        else:
+            # ── 定向修复轮:只改评审点名的部分 ──
+            sections = [f.get("section") or "?" for f in review_fixes_needed]
+            q.put({"event": "step",
+                   "message": f"评审未达标,正在按评审意见定向修复(第 {review_retry_count} 次):{'、'.join(sections)}…"})
+            q.put({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
+            need_full_redo, desc = apply_targeted_fixes(fix_state, review_fixes_needed)
+            if need_full_redo:
+                q.put({"event": "agent_done", "agent": "packager",
+                       "summary": {"定向修复": "部分完成,剩余问题需全量重做"}})
+                if stop_event.is_set():
+                    return
+                q.put({"event": "agent_start", "agent": "generator", "name": AGENTS["generator"]})
+                gen = agents["generator"]({
+                    "selected_topic": effective_topic,
+                    "target_question_count": count,
+                    "dimension_defs": nav.get("dimension_defs", []),
+                    "review_retry_count": review_retry_count,
+                    "review_fixes_needed": review_fixes_needed,
+                })
+                q_count = len(gen.get("questions_json", {}).get("questions", []))
+                q.put({"event": "agent_done", "agent": "generator", "summary": {"题目数": q_count}})
+                if stop_event.is_set():
+                    return
+                q.put({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
+                pkg = agents["packager"]({
+                    "selected_topic": effective_topic,
+                    "target_question_count": count,
+                    "suggested_price": 1.99,
+                    "dimension_defs": nav.get("dimension_defs", []),
+                    "questions_json": gen.get("questions_json", {}),
+                })
+                q.put({"event": "agent_done", "agent": "packager",
+                       "summary": {"文案": (pkg.get("packaging_text") or "")[:60]}})
+                if stop_event.is_set():
+                    return
+            else:
+                # 重新渲染 HTML(修复后的 style/personality/analysis/题目)
+                pkg["generated_html"] = re_render(fix_state)
+                pkg["packaging_text"] = fix_state["copy_text"]
+                q.put({"event": "agent_done", "agent": "packager",
+                       "summary": {"定向修复": "、".join(desc) or "完成"}})
+                if stop_event.is_set():
+                    return
+
+        fix_state = build_fix_state()
 
         q.put({"event": "agent_start", "agent": "reviewer", "name": AGENTS["reviewer"]})
         rev = agents["reviewer"]({
             "selected_topic": effective_topic,
-            "questions_json": gen.get("questions_json", {}),
+            "questions_json": fix_state["questions_json"],
             "generated_html": pkg.get("generated_html", ""),
-            "packaging_text": pkg.get("packaging_text", ""),
-            "dimension_defs": nav.get("dimension_defs", []),
+            "packaging_text": fix_state["copy_text"],
+            "dimension_defs": fix_state["dimension_defs"],
+            "_personality_data": fix_state["personality"],
+            "style": fix_state["style"],
             "review_retry_count": review_retry_count,
             "review_fixes_needed": review_fixes_needed,
         })
@@ -205,8 +328,6 @@ def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Ev
             break
         if attempt >= MAX_REVIEW_RETRIES:
             break  # 防御:重做次数用尽(attempt 硬上限)
-        q.put({"event": "step",
-               "message": f"评审 {score}/10 未达标,正在按评审意见重做(第 {review_retry_count} 次)…"})
 
     # ═══ 审核: 展示结果;fail 不回退(web 交互场景,反馈非结构化无法消费)═══
     q.put({"event": "agent_start", "agent": "auditor", "name": AGENTS["auditor"]})

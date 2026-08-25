@@ -59,6 +59,16 @@ class TestParseCommand:
         assert cmd["topic"] == "你几岁了"
         assert cmd["question_count"] == 10
 
+    def test_chinese_number_counts(self):
+        """中文数字题量:"五题"→5、"十五题"→15、"二十三题"→23、"十题"→10。"""
+        assert parse_command("你的核心欲望，五题")["question_count"] == 5
+        assert parse_command("你的核心欲望，五题")["topic"] == "你的核心欲望"
+        assert parse_command("做十五题")["question_count"] == 15
+        assert parse_command("做二十三道测试题")["question_count"] == 23
+        assert parse_command("做十题")["question_count"] == 10
+        assert parse_command("做两题")["question_count"] == 2
+        assert parse_command("做五道")["question_count"] == 5
+
     def test_publish_intent(self):
         assert parse_command("发小红书吧")["type"] == "publish"
 

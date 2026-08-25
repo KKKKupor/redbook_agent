@@ -252,7 +252,7 @@ class TestReviewLoop:
         return [_e["event"] for _e in _frames(generate_stream(cmd, "test-ip", agents=agents, **kw))]
 
     def test_redo_uses_reviewer_fixes(self):
-        """评分不达标 → generator 重做,第二轮注入 retry_count 与修复意见。"""
+        """评分不达标且修复无法定向(questions 无 question_id)→ 回退全量生成并注入修复意见。"""
         agents, gen, pkg = self._make()
         rev = _SeqAgent([
             {"review_score": 4, "review_verdict": "revise", "review_retry_count": 1,
@@ -266,12 +266,12 @@ class TestReviewLoop:
         assert starts.count("generator") == 2
         assert starts.count("reviewer") == 2
         assert gen.calls == 2 and rev.calls == 2
-        # 第二轮 generator 收到修复注入
+        # 回退的全量生成收到修复注入
         assert gen.states[1]["review_retry_count"] == 1
         assert gen.states[1]["review_fixes_needed"]
-        # 有 step 重做提示帧;done 帧素材取最后成功一轮 pkg 的文案
+        # 有 step 修复提示帧;done 帧素材取最后成功一轮 pkg 的文案
         step_msgs = [e.get("message", "") for e in events if e["event"] == "step"]
-        assert any("重做" in m for m in step_msgs)
+        assert any("修复" in m for m in step_msgs)
         assert events[-1]["post_materials"]["copy"] == "文案二"
 
     def test_force_pass_after_max_retries(self):
@@ -290,7 +290,7 @@ class TestReviewLoop:
         assert events[-1]["url"]
 
     def test_loop_bounded_when_retry_count_stalls(self):
-        """reviewer 判不过但 retry_count 不递增(异常响应)→ 循环硬上限不死循环。"""
+        """reviewer 判不过但 retry_count 不递增(异常响应)→ 循环硬上限不死循环,且不反复从头生成。"""
         agents, gen, pkg = self._make()
         rev = _SeqAgent([
             {"review_score": 3, "review_verdict": "reject", "review_retry_count": 0, "review_fixes_needed": []},
@@ -298,7 +298,8 @@ class TestReviewLoop:
         agents["reviewer"] = rev
         events = _frames(generate_stream({"type": "generate", "topic": "测试", "question_count": 5},
                                          "test-ip", agents=agents))
-        assert gen.calls == 3
+        # 定向轮不重跑 generator(空修复只重渲染),循环由 attempt 硬上限终止
+        assert gen.calls == 1
         assert events[-1]["event"] == "done"
 
 
@@ -311,6 +312,69 @@ class TestLocalQuizUrl:
     def test_empty_and_unmappable_passthrough(self):
         assert _local_quiz_url("") == ""
         assert _local_quiz_url("C:/some/local/path.png") == "C:/some/local/path.png"
+
+
+class TestTargetedFix:
+    def test_review_fails_applies_targeted_fixes_without_regenerating(self, monkeypatch):
+        """定向修复:评审点名的部分单独修,generator 不从头生成。"""
+        import fix_issues as fi
+        calls = []
+        monkeypatch.setattr(fi, "fix_personality",
+                            lambda state, llm: (calls.append("personality"), {"primary_tag": "青年感"})[1])
+        monkeypatch.setattr(fi, "fix_copy",
+                            lambda state, llm: (calls.append("copy"), "新文案")[1])
+        monkeypatch.setattr(fi, "fix_analysis_dim",
+                            lambda state, dim_id, llm: (calls.append(f"analysis:{dim_id}"),
+                                                        {"dim_id": dim_id, "核心特质": "x"})[1])
+        monkeypatch.setattr(fi, "fix_question",
+                            lambda state, qid, issue, action, llm: (calls.append(f"q{qid}"),
+                                                                    {"id": qid, "text": "t", "type": "situational", "options": []})[1])
+        monkeypatch.setattr(fi, "fix_style",
+                            lambda state, llm: (calls.append("style"), {"theme": "light"})[1])
+
+        agents = _fake_agents()
+        gen = _SeqAgent([{"questions_json": {"questions": [{"id": 1}, {"id": 5}]}}])
+        agents["generator"] = gen
+        rev = _SeqAgent([
+            {"review_score": 4, "review_verdict": "revise", "review_retry_count": 1,
+             "review_fixes_needed": [
+                 {"section": "personality", "issue": "标签脱节", "action": "改成年龄向"},
+                 {"section": "copy", "issue": "违禁词", "action": "重写"},
+                 {"section": "analysis", "dim_id": "D1", "issue": "太短", "action": "重写"},
+                 {"section": "questions", "question_id": 5, "issue": "负分", "action": "修复"},
+             ]},
+            {"review_score": 8, "review_verdict": "approve", "review_retry_count": 1, "review_fixes_needed": []},
+        ])
+        agents["reviewer"] = rev
+        events = _frames(generate_stream({"type": "generate", "topic": "测试", "question_count": 5},
+                                         "test-ip", agents=agents))
+        assert gen.calls == 1, "定向修复轮不应从头生成题目"
+        assert "personality" in calls and "copy" in calls and "analysis:D1" in calls and "q5" in calls
+        assert rev.calls == 2
+        assert events[-1]["event"] == "done"
+        # 定向修复轮有 step 提示
+        step_msgs = [e.get("message", "") for e in events if e["event"] == "step"]
+        assert any("定向修复" in m for m in step_msgs)
+
+    def test_unknown_section_falls_back_to_full_redo(self, monkeypatch):
+        """fixes 含未知 section(如 all)→ 回退全量生成。"""
+        import fix_issues as fi
+        calls = []
+        monkeypatch.setattr(fi, "fix_personality", lambda state, llm: (calls.append("p"), {})[1])
+        agents = _fake_agents()
+        gen = _SeqAgent([{"questions_json": {"questions": [{"id": 1}]}}])
+        agents["generator"] = gen
+        rev = _SeqAgent([
+            {"review_score": 4, "review_verdict": "revise", "review_retry_count": 1,
+             "review_fixes_needed": [{"section": "all", "issue": "整体质量低", "action": "重做"}]},
+            {"review_score": 7, "review_verdict": "approve", "review_retry_count": 1, "review_fixes_needed": []},
+        ])
+        agents["reviewer"] = rev
+        events = _frames(generate_stream({"type": "generate", "topic": "测试", "question_count": 5},
+                                         "test-ip", agents=agents))
+        assert gen.calls == 2  # 全量回退
+        assert "p" not in calls  # 定向修复未执行(直接回退)
+        assert events[-1]["event"] == "done"
 
 
 class TestAuditorAndMaterials:

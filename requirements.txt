@@ -19,6 +19,8 @@ gitpython>=3.1.0
 httpx>=0.28.0
 requests>=2.32.0
 openai>=2.45.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
 
 # ===== Web Scraping =====
 playwright>=1.62.0

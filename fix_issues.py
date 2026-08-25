@@ -140,6 +140,8 @@ def fix_question(state: dict, question_id: int, issue: str, action: str, llm) ->
 
     dim_names = ", ".join([f"{d['id']}={d['name']}" for d in dims])
     old_text = json.dumps(old_q, ensure_ascii=False, indent=2)
+    # 分值上限与生成器一致的动态评分:round(100/题数)
+    max_score = max(1, round(100 / max(1, len(questions))))
 
     prompt = (
         f"修复一道测试题。选题: {topic}\n"
@@ -149,8 +151,8 @@ def fix_question(state: dict, question_id: int, issue: str, action: str, llm) ->
         f"修改要求: {action}\n\n"
         f"规则:\n"
         f"1. 保持题目id={question_id}和type不变\n"
-        f"2. 所有分值必须≥0且≤3\n"
-        f"3. 每个选项对2-4个维度给正分，其余为0\n"
+        f"2. 所有分值必须≥0且≤{max_score}(每题分值上限=round(100/题数),与整套题一致)\n"
+        f"3. 每个选项只对1-2个核心维度给正分，其余为0\n"
         f"4. 消除社会赞许性偏差\n"
         f"5. 只输出修复后的JSON: {{\"id\":{question_id},\"text\":\"...\",\"type\":\"...\",\"options\":[{{\"label\":\"A\",\"text\":\"...\",\"scores\":{{...}}}}]}}"
     )
