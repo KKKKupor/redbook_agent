@@ -28,7 +28,8 @@ def parse_command(text: str) -> dict:
     if topic_match:
         topic = re.sub(r'[，,。\s]*\d+\s*[道个]?\s*(?:测试)?题.*$', '', topic_match.group(1)).strip()
     else:
-        topic = text[:30]
+        # 无动词前缀(如"你几岁了,10道题")同样剥离题量尾巴
+        topic = re.sub(r'[，,。\s]*\d+\s*[道个]?\s*(?:测试)?题.*$', '', text[:30]).strip()
     if re.fullmatch(r'\d+\s*[道个]?', topic):
         # 纯题量残留("做15道")→ 空选题
         topic = ""

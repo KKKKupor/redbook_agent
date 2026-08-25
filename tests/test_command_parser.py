@@ -53,6 +53,12 @@ class TestParseCommand:
         assert parse_command("帮我生成测试")["topic"] == ""
         assert parse_command("做15道")["topic"] == ""
 
+    def test_bare_topic_with_count_stripped(self):
+        """无动词前缀的选题(如"你几岁了,10道题")同样剥离题量尾巴。"""
+        cmd = parse_command("你几岁了，10道题")
+        assert cmd["topic"] == "你几岁了"
+        assert cmd["question_count"] == 10
+
     def test_publish_intent(self):
         assert parse_command("发小红书吧")["type"] == "publish"
 

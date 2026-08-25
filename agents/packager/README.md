@@ -4,6 +4,10 @@
 **Temperature**: 0.7  
 **模型**: DeepSeek-Chat (max_tokens=8192)  
 
+## 2026-08-25 变更
+- **personality skill 标签切题**: 新增第8类"年龄感测试"(标签用年龄段/年龄感表述,禁用人格类型词);primary_tag 必须与选题关键词语义同域(响应"你几岁了"却给"责任担当者"标签的反馈)
+- **模板雷达图**: `test_template.html` 动态 r.max(分数相近时放大差异)、tension 0.4 平滑、pointRadius 3、标签/网格颜色随主题、tooltip 显示真实 /100 分数
+
 ## 2026-08-10 变更
 - **分析逐维生成**: `_gen_analysis` 改为每维单独调LLM，强制均等字数（最长/最短≈1.1x）
 - **人格IP覆盖**: `_gen_personality` 收到`ip_info`时完全替换prompt，强制输出角色名而非抽象标签

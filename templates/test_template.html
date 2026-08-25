@@ -396,26 +396,41 @@
       var ctx = document.getElementById('radarChart').getContext('2d');
       if (radarChart) { radarChart.destroy(); }
       var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+      var labelColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#888888';
+      var chartData = dimensionDefs.map(function(d) { return normalized[d.id]; });
+      // 动态上限:分数相近时自动放大差异(真实分数仍显示在维度卡片 /100)
+      var topScore = Math.max.apply(null, chartData.concat([0]));
+      var rMax = Math.min(100, Math.max(30, Math.ceil(topScore * 1.25 / 10) * 10));
       radarChart = new Chart(ctx, {
         type: 'radar',
         data: {
           labels: dimensionDefs.map(function(d) { return d.name; }),
           datasets: [{
             label: '你的得分',
-            data: dimensionDefs.map(function(d) { return normalized[d.id]; }),
-            backgroundColor: accent + '33',
+            data: chartData,
+            backgroundColor: accent + '2e',
             borderColor: accent,
-            borderWidth: 2.5,
+            borderWidth: 2,
             pointBackgroundColor: accent,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            tension: 0.2,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            tension: 0.4,
           }]
         },
         options: {
           responsive: true,
-          scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 11 } } } },
-          plugins: { legend: { display: false } }
+          scales: { r: {
+            beginAtZero: true,
+            max: rMax,
+            ticks: { stepSize: Math.max(10, Math.round(rMax / 5 / 10) * 10), backdropColor: 'transparent', font: { size: 11 }, color: labelColor },
+            pointLabels: { color: labelColor, font: { size: 12 } },
+            angleLines: { color: labelColor + '44' },
+            grid: { color: labelColor + '33' },
+          } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function (item) { return ' ' + Math.round(item.parsed.r) + ' / 100'; } } }
+          }
         }
       });
     }
