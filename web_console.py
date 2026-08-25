@@ -136,6 +136,7 @@ def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Ev
         "target_question_count": count,
         "suggested_price": 1.99,
         "user_message": user_message,
+        "entry_web": True,
     })
     if nav.get("rejected"):
         # 网页入口拒绝(题量超限/无关输入):navigator 已流式输出说明,链终止
@@ -143,8 +144,9 @@ def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Ev
         q.put({"event": "done", "url": "", "rejected": True, "reply": nav.get("reply", ""),
                "cost": round(token_summary()["total_cost"], 4)})
         return
-    # 空选题时回传 navigator 的池选题(标题不再用用户 prompt 原文)
+    # navigator 已判读用户意图:选题(用户指定或池)与题量(LLM 判读)均以返回值为准
     effective_topic = (nav.get("selected_topic") or topic or "").strip()
+    count = int(nav.get("target_question_count") or count)
     q.put({"event": "agent_done", "agent": "navigator",
            "summary": {"选题": effective_topic,
                         "维度数": len(nav.get("dimension_defs", [])),

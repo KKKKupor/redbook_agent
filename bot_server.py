@@ -41,17 +41,21 @@ def send_dingtalk(title: str, content: str):
     httpx.post(DINGTALK_URL, json=payload, timeout=10)
 
 
-async def generate_test(topic: str, question_count: int) -> dict:
+async def generate_test(topic: str, question_count: int, user_text: str = "") -> dict:
     """Navigator → Generator → Packager → Publisher (full auto chain)."""
     global _last_topic, _last_count
     _last_topic = topic
     _last_count = question_count
     token_reset()
 
-    # 1. Navigator
-    state = {"selected_topic": topic, "target_question_count": question_count, "suggested_price": 1.99}
+    # 1. Navigator(带用户原话:选题/题量由 navigator LLM 判读,句式不限)
+    state = {"selected_topic": topic, "target_question_count": question_count,
+             "suggested_price": 1.99, "user_message": user_text}
     nav = navigator_node(state)
-    topic = nav.get("selected_topic") or topic   # 空选题时回传 navigator 的池选题
+    if nav.get("rejected"):
+        return {"rejected": True, "reply": nav.get("reply", "单次最多生成60题")}
+    topic = nav.get("selected_topic") or topic   # 判读选题/池选题
+    question_count = int(nav.get("target_question_count") or question_count)
 
     # 2. Generator
     gen = generator_node({"selected_topic": topic, "target_question_count": question_count, "dimension_defs": nav.get("dimension_defs", [])})
@@ -91,20 +95,21 @@ async def dingtalk_webhook(request: Request):
     cmd_type = cmd["type"]
 
     if cmd_type == "generate":
-        topic = cmd["topic"]
-        count = cmd["question_count"]
         send_dingtalk(
-            f"收到 - {topic}",
-            f"## 🤖 收到 @{sender}\n\n**选题**: {topic}\n**题量**: {count}题\n\n⏳ Navigator 正在规划中...\n\n小红书"
+            "收到",
+            f"## 🤖 收到 @{sender}\n\n**原话**: {text[:100]}\n\n⏳ Navigator 正在理解意图并规划中...\n\n小红书"
         )
         try:
-            result = await generate_test(topic, count)
-            reply = (
-                f"## ✅ Navigator 已完成 - {topic}\n\n"
-                f"**题量**: {result['questions']}题 | 花费: ¥{result['cost']:.4f}\n"
-                f"**链接**: [打开测试]({result['url']})\n\n"
-                f"审核后回复\"发小红书\"即可发布\n\n小红书"
-            )
+            result = await generate_test(cmd["topic"], cmd["question_count"], user_text=text)
+            if result.get("rejected"):
+                reply = f"## ⚠️ 未生成\n\n{result['reply']}\n\n小红书"
+            else:
+                reply = (
+                    f"## ✅ Navigator 已完成 - {result['topic']}\n\n"
+                    f"**题量**: {result['questions']}题 | 花费: ¥{result['cost']:.4f}\n"
+                    f"**链接**: [打开测试]({result['url']})\n\n"
+                    f"审核后回复\"发小红书\"即可发布\n\n小红书"
+                )
         except Exception as e:
             reply = f"## ❌ 生成失败\n\n{str(e)[:200]}\n\n小红书"
 

@@ -420,6 +420,28 @@ class TestAuditorAndMaterials:
         assert by_agent["reviewer"]["summary"]["评分"] == 7
         assert by_agent["auditor"]["summary"]["审核"] == "pass"
 
+    def test_navigator_interpreted_count_used_downstream(self):
+        """题量以 navigator 判读值为准(用户说"五题"→ navigator 返回 5 → generator 收到 5)。"""
+        agents = _fake_agents()
+        seen = {}
+
+        def nav(state):
+            return {"selected_topic": "你适合什么工作",
+                    "target_question_count": 5,
+                    "dimension_defs": [{"id": "D1"}], "suggested_price": 1.99}
+
+        def gen(state):
+            seen["count"] = state["target_question_count"]
+            return {"questions_json": {"questions": [{"id": 1}] * 5}}
+
+        agents["navigator"] = nav
+        agents["generator"] = gen
+        events = _frames(generate_stream({"type": "generate", "topic": "", "question_count": 15,
+                                          "text": "五题，你适合什么工作"},
+                                         "test-ip", agents=agents))
+        assert events[-1]["event"] == "done"
+        assert seen["count"] == 5
+
     def test_effective_topic_from_navigator_used_downstream(self):
         """无主题输入 → navigator 池选题回传,下游 generator/packager/publisher 用池选题。"""
         agents = _fake_agents()

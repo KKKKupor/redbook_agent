@@ -33,6 +33,7 @@ from tools.sales_tools import (
 
 NAVIGATOR_SYSTEM_PROMPT = load_skill(__file__, "system")
 REFUSAL_SYSTEM_PROMPT = load_skill(__file__, "refusal")
+GATE_SYSTEM_PROMPT = load_skill(__file__, "gate")
 
 GENERATED_FILE = Path(__file__).resolve().parent.parent.parent.parent / "data" / "generated_topics.json"
 
@@ -149,16 +150,7 @@ def navigator_node(state: dict) -> dict:
         Partial state dict with decision fields
     """
     user_message = (state.get("user_message") or "").strip()
-    try:
-        req_count = int(state.get("target_question_count") or 15)
-    except (TypeError, ValueError):
-        req_count = 15
-
-    # ═══ Web 入口校验(仅网页场景 user_message 非空时生效)═══
-    # 路径 A:题量超限 → LLM 生成拒绝文案,零副作用(不查工具、不写选题历史)
-    if user_message and req_count > MAX_QUESTIONS:
-        reply = _request_refusal_copy(req_count, user_message)
-        return {"rejected": True, "reply": reply}
+    entry_web = bool(state.get("entry_web"))
 
     llm = navigator_llm()
 
@@ -189,8 +181,47 @@ def navigator_node(state: dict) -> dict:
     if not pool_loaded:
         note("navigator", "topic_pool_hardcoded", "data/topic_pool.json 缺失或不足,使用硬编码话题池")
 
+    requested_topic = ""
+    requested_count = 15
+
+    # ═══ 入口判定 + 用户意图解析(LLM 判读,句式不限)—— user_message 非空时生效 ═══
+    if user_message:
+        try:
+            gate_resp = llm.invoke([
+                SystemMessage(content=GATE_SYSTEM_PROMPT),
+                HumanMessage(content=user_message),
+            ])
+            add_from_response("navigator", gate_resp)
+            save_prompt("navigator", GATE_SYSTEM_PROMPT + "\n\n" + user_message)
+            save_response("navigator", gate_resp.content)
+            gate_content = gate_resp.content.strip()
+            if gate_content.startswith("```"):
+                gate_content = gate_content.split("```")[1]
+                if gate_content.startswith("json"):
+                    gate_content = gate_content[4:]
+            gate = json.loads(gate_content)
+        except Exception as e:
+            logger.warning(f"Navigator gate parse failed: {e}, assuming related input")
+            gate = {}
+
+        if gate.get("rejected"):
+            return {"rejected": True, "reply": str(gate.get("reply") or _REFUSAL_FALLBACK).strip()}
+
+        requested_topic = (gate.get("user_requested_topic") or "").strip()
+        if requested_topic and len(requested_topic) <= 2:
+            requested_topic = ""
+        try:
+            requested_count = int(gate.get("user_requested_count") or 15)
+        except (TypeError, ValueError):
+            requested_count = 15
+
+        # 题量超限(仅网页入口):LLM 生成拒绝文案,零副作用
+        if entry_web and requested_count > MAX_QUESTIONS:
+            reply = _request_refusal_copy(requested_count, user_message)
+            return {"rejected": True, "reply": reply}
+
     # ═══ 选题决策: 用户选题优先;否则池 70/30 轮转且不重复已生成选题 ═══
-    user_topic = state.get("selected_topic") or None  # 仅非空视为用户选题
+    user_topic = requested_topic or (state.get("selected_topic") or "").strip() or None
     sel = select_topic(user_topic, REAL_TOPIC_POOL, _load_generated(), random.random())
     if sel["strategy"] != "user":
         _save_generated(sel["generated"])
@@ -219,18 +250,6 @@ def navigator_node(state: dict) -> dict:
 
 注意: 不要在JSON中更改selected_topic——使用给定的「{selected_topic_name}」。
 """
-
-    # 路径 B:网页输入先判定是否与测试题生成相关(仅 web 场景出现,不污染日常调度 prompt)
-    if user_message:
-        context += (
-            f"\n## 用户原话(来自网页输入)\n{user_message}\n"
-            "## 入口判定要求\n"
-            "先判断用户原话是否在请求生成付费测试题。若不是(如闲聊、提问「你叫什么」、其他无关内容),"
-            "不要执行上面的任务,直接输出:\n"
-            '{"rejected": true, "reply": "1-3句话的能力边界说明:本网页只生成付费心理测试题,'
-            '并给出示例指令如「做一个人格阴影测试,15题」"}\n'
-            "若用户确实在请求生成测试题,忽略本段,严格按原输出格式正常输出。"
-        )
 
     try:
         response = llm.invoke([
@@ -273,6 +292,10 @@ def navigator_node(state: dict) -> dict:
     # Web 入口判定:LLM 判定输入与测试题无关 → 早退拒绝(不进入 jitter/选题保存)
     if isinstance(decision, dict) and decision.get("rejected"):
         return {"rejected": True, "reply": str(decision.get("reply") or _REFUSAL_FALLBACK).strip()}
+
+    # 语义判读的题量覆盖:用户明确说了题数(含中文数字)则以此为准
+    if user_message:
+        decision["target_question_count"] = requested_count
 
     # Apply jitter
     jitter = _calculate_jitter()
