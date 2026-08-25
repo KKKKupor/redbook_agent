@@ -32,8 +32,14 @@ from tools.sales_tools import (
 
 
 NAVIGATOR_SYSTEM_PROMPT = load_skill(__file__, "system")
+REFUSAL_SYSTEM_PROMPT = load_skill(__file__, "refusal")
 
 GENERATED_FILE = Path(__file__).resolve().parent.parent.parent.parent / "data" / "generated_topics.json"
+
+# Web 入口约束(仅 user_message 非空的 web 场景生效;钉钉/日常调度不传 user_message)
+MAX_QUESTIONS = 60
+TOKENS_PER_QUESTION = 325  # 实测 15题≈4871 out tokens;仅作拒绝文案素材
+_REFUSAL_FALLBACK = "本网页单次最多生成 60 题测试,请减少题量后重试。"
 
 
 def select_topic(user_topic: str | None, pool: list, generated: set, roll: float) -> dict:
@@ -99,6 +105,36 @@ def _compute_diversity_ok(topic: str, diversity: dict) -> bool:
     return True
 
 
+def _request_refusal_copy(req_count: int, user_message: str) -> str:
+    """题量超限时让 LLM 生成拒绝文案(流式可见);失败用模板兜底,拒绝结论不变。"""
+    llm = navigator_llm()
+    est_tokens = req_count * TOKENS_PER_QUESTION
+    human = (
+        f"用户请求: {user_message or '(未提供)'}\n"
+        f"请求题数: {req_count} 题\n"
+        f"本网页上限: {MAX_QUESTIONS} 题\n"
+        f"按请求题数估算将消耗约 {est_tokens} 输出 token,超出本网页预算。\n"
+        "请生成礼貌的拒绝文案:说明单次上限 60 题并建议减少题量,"
+        '严格输出 JSON: {"reply": "..."}'
+    )
+    try:
+        resp = llm.invoke([SystemMessage(content=REFUSAL_SYSTEM_PROMPT), HumanMessage(content=human)])
+        add_from_response("navigator", resp)
+        content = resp.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        try:
+            reply = str(json.loads(content).get("reply", "")).strip()
+        except json.JSONDecodeError:
+            reply = content.strip()
+        return reply or _REFUSAL_FALLBACK
+    except Exception as e:
+        logger.warning(f"Navigator refusal copy failed, using fallback: {e}")
+        return _REFUSAL_FALLBACK
+
+
 def navigator_node(state: dict) -> dict:
     """
     LangGraph node: 领航员决策。
@@ -112,6 +148,18 @@ def navigator_node(state: dict) -> dict:
     Returns:
         Partial state dict with decision fields
     """
+    user_message = (state.get("user_message") or "").strip()
+    try:
+        req_count = int(state.get("target_question_count") or 15)
+    except (TypeError, ValueError):
+        req_count = 15
+
+    # ═══ Web 入口校验(仅网页场景 user_message 非空时生效)═══
+    # 路径 A:题量超限 → LLM 生成拒绝文案,零副作用(不查工具、不写选题历史)
+    if user_message and req_count > MAX_QUESTIONS:
+        reply = _request_refusal_copy(req_count, user_message)
+        return {"rejected": True, "reply": reply}
+
     llm = navigator_llm()
 
     # Gather data for the decision (returns empty on first run — no DB)
@@ -172,6 +220,18 @@ def navigator_node(state: dict) -> dict:
 注意: 不要在JSON中更改selected_topic——使用给定的「{selected_topic_name}」。
 """
 
+    # 路径 B:网页输入先判定是否与测试题生成相关(仅 web 场景出现,不污染日常调度 prompt)
+    if user_message:
+        context += (
+            f"\n## 用户原话(来自网页输入)\n{user_message}\n"
+            "## 入口判定要求\n"
+            "先判断用户原话是否在请求生成付费测试题。若不是(如闲聊、提问「你叫什么」、其他无关内容),"
+            "不要执行上面的任务,直接输出:\n"
+            '{"rejected": true, "reply": "1-3句话的能力边界说明:本网页只生成付费心理测试题,'
+            '并给出示例指令如「做一个人格阴影测试,15题」"}\n'
+            "若用户确实在请求生成测试题,忽略本段,严格按原输出格式正常输出。"
+        )
+
     try:
         response = llm.invoke([
             SystemMessage(content=NAVIGATOR_SYSTEM_PROMPT),
@@ -209,6 +269,10 @@ def navigator_node(state: dict) -> dict:
             "scheduled_publish_time": (datetime.now() + timedelta(days=1)).replace(hour=21, minute=15).isoformat(),
             "decision_reasoning": "JSON解析失败，使用安全默认值",
         }
+
+    # Web 入口判定:LLM 判定输入与测试题无关 → 早退拒绝(不进入 jitter/选题保存)
+    if isinstance(decision, dict) and decision.get("rejected"):
+        return {"rejected": True, "reply": str(decision.get("reply") or _REFUSAL_FALLBACK).strip()}
 
     # Apply jitter
     jitter = _calculate_jitter()

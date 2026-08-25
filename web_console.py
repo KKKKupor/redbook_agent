@@ -1,11 +1,17 @@
-"""Web 控制台 — Linear 风格单页 + SSE 流式生成。
+"""Web 控制台 — Claude 风格单页 + SSE 流式生成。
 
 启动: python web_console.py  (端口 8090)
 访问: http://localhost:8090/
+
+架构: agent 链在后台 worker 线程执行,事件(含 LLM token)写入线程安全队列;
+SSE 生成器实时消费队列,保证 token 逐帧到达前端(而非 agent 完成后一口气发出)。
 """
 
 import json
+import os
+import queue
 import sys
+import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -19,31 +25,41 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from utils.command_parser import parse_command
-from utils.daily_limit import DailyLimit
+from utils.daily_limit import DEFAULT_LOOPBACK, DailyLimit
 from utils.stream_bus import set_emitter, reset_emitter
-from utils.token_tracker import summary as token_summary, reset as token_reset
+from utils.token_tracker import summary as token_summary
 
 app = FastAPI()
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "web_console.html"
-LIMIT = DailyLimit(Path(__file__).resolve().parent / "data" / "rate_limit.json")
+# 白名单 = 回环(本机测试)∪ env 配置;白名单 IP 不限次、不消耗配额
+LIMIT = DailyLimit(
+    Path(__file__).resolve().parent / "data" / "rate_limit.json",
+    whitelist=DEFAULT_LOOPBACK | {ip.strip() for ip in os.getenv("WHITELIST_IPS", "").split(",") if ip.strip()},
+)
 _running: set = set()
 
 AGENTS = {
     "navigator": "领航员 Navigator",
     "generator": "生成器 Generator",
     "packager": "包装师 Packager",
+    "reviewer": "评审员 Reviewer",
+    "auditor": "审核员 Auditor",
     "publisher": "发布器 Publisher",
 }
 
+MAX_REVIEW_RETRIES = 2   # 评审不达标最多重做2次(Evaluator-Optimizer 设计意图)
 
-class _Emitter:
-    """把事件写入生成器的中间缓冲(生成器在后台线程逐帧消费)。"""
+_SENTINEL = object()
 
-    def __init__(self):
-        self.queue = []
+
+class _QueueEmitter:
+    """把事件写入线程安全队列(worker 线程生产,SSE 生成器消费)。"""
+
+    def __init__(self, q: queue.Queue):
+        self.q = q
 
     def emit(self, event: dict) -> None:
-        self.queue.append(event)
+        self.q.put(event)
 
 
 def _sse(event: dict) -> str:
@@ -85,6 +101,8 @@ async def generate(request: Request):
     if not LIMIT.allow(ip):
         return JSONResponse({"error": "今日生成次数已用完,明天再来吧"}, status_code=429)
 
+    # 提前占位:防止两个同 IP 请求在流首次迭代前同时通过 _running 检查
+    _running.add(ip)
     return StreamingResponse(
         generate_stream(cmd, ip),
         media_type="text/event-stream",
@@ -92,82 +110,180 @@ async def generate(request: Request):
     )
 
 
-def generate_stream(cmd: dict, ip: str, agents: dict | None = None):
-    """四段链生成器,逐事件产出 SSE 帧。agents 可注入(测试用)。
+def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Event) -> None:
+    """六段链(含评审闭环)在 worker 线程内执行;事件(含 LLM token)实时入队。"""
+    topic = cmd["topic"]
+    count = cmd["question_count"]
+    user_message = cmd.get("text", "")
 
-    agents 形如 {"navigator": fn, "generator": fn, "packager": fn, "publisher": fn}。
+    q.put({"event": "agent_start", "agent": "navigator", "name": AGENTS["navigator"]})
+    nav = agents["navigator"]({
+        "selected_topic": topic,
+        "target_question_count": count,
+        "suggested_price": 1.99,
+        "user_message": user_message,
+    })
+    if nav.get("rejected"):
+        # 网页入口拒绝(题量超限/无关输入):navigator 已流式输出说明,链终止
+        q.put({"event": "agent_done", "agent": "navigator", "summary": {"状态": "已拒绝"}})
+        q.put({"event": "done", "url": "", "rejected": True, "reply": nav.get("reply", ""),
+               "cost": round(token_summary()["total_cost"], 4)})
+        return
+    # 空选题时回传 navigator 的池选题(标题不再用用户 prompt 原文)
+    effective_topic = (nav.get("selected_topic") or topic or "").strip()
+    q.put({"event": "agent_done", "agent": "navigator",
+           "summary": {"选题": effective_topic,
+                        "维度数": len(nav.get("dimension_defs", [])),
+                        "定价": nav.get("suggested_price")}})
+    if stop_event.is_set():
+        return
+
+    # ═══ 评审闭环: generator → packager → reviewer,评分不达标按修复意见重做(最多2次)═══
+    review_retry_count = 0
+    review_fixes_needed: list = []
+    for attempt in range(1 + MAX_REVIEW_RETRIES):
+        q.put({"event": "agent_start", "agent": "generator", "name": AGENTS["generator"]})
+        gen = agents["generator"]({
+            "selected_topic": effective_topic,
+            "target_question_count": count,
+            "dimension_defs": nav.get("dimension_defs", []),
+            "review_retry_count": review_retry_count,
+            "review_fixes_needed": review_fixes_needed,
+        })
+        q_count = len(gen.get("questions_json", {}).get("questions", []))
+        q.put({"event": "agent_done", "agent": "generator", "summary": {"题目数": q_count}})
+        if stop_event.is_set():
+            return
+
+        q.put({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
+        pkg = agents["packager"]({
+            "selected_topic": effective_topic,
+            "target_question_count": count,
+            "suggested_price": 1.99,
+            "dimension_defs": nav.get("dimension_defs", []),
+            "questions_json": gen.get("questions_json", {}),
+        })
+        q.put({"event": "agent_done", "agent": "packager",
+               "summary": {"文案": (pkg.get("packaging_text") or "")[:60]}})
+        if stop_event.is_set():
+            return
+
+        q.put({"event": "agent_start", "agent": "reviewer", "name": AGENTS["reviewer"]})
+        rev = agents["reviewer"]({
+            "selected_topic": effective_topic,
+            "questions_json": gen.get("questions_json", {}),
+            "generated_html": pkg.get("generated_html", ""),
+            "packaging_text": pkg.get("packaging_text", ""),
+            "dimension_defs": nav.get("dimension_defs", []),
+            "review_retry_count": review_retry_count,
+            "review_fixes_needed": review_fixes_needed,
+        })
+        score = rev.get("review_score", 0)
+        q.put({"event": "agent_done", "agent": "reviewer",
+               "summary": {"评分": score, "结论": rev.get("review_verdict", ""),
+                            "重做次数": rev.get("review_retry_count", 0)}})
+        if stop_event.is_set():
+            return
+
+        review_retry_count = rev.get("review_retry_count", review_retry_count)  # reviewer 判不过时自增
+        review_fixes_needed = rev.get("review_fixes_needed") or []
+        if score >= 6 or rev.get("review_verdict") == "approve" or review_retry_count > MAX_REVIEW_RETRIES:
+            break
+        if attempt >= MAX_REVIEW_RETRIES:
+            break  # 防御:重做次数用尽(attempt 硬上限)
+        q.put({"event": "step",
+               "message": f"评审 {score}/10 未达标,正在按评审意见重做(第 {review_retry_count} 次)…"})
+
+    # ═══ 审核: 展示结果;fail 不回退(web 交互场景,反馈非结构化无法消费)═══
+    q.put({"event": "agent_start", "agent": "auditor", "name": AGENTS["auditor"]})
+    aud = agents["auditor"]({
+        "generated_html": pkg.get("generated_html", ""),
+        "packaging_text": pkg.get("packaging_text", ""),
+        "questions_json": gen.get("questions_json", {}),
+        "retry_count": 0,
+    })
+    audit_status = aud.get("audit_status", "pass")
+    audit_feedback = aud.get("audit_feedback", "")
+    q.put({"event": "agent_done", "agent": "auditor",
+           "summary": {"审核": audit_status, "反馈": audit_feedback[:120]}})
+    if stop_event.is_set():
+        return
+
+    q.put({"event": "step", "message": "正在生成封面图并部署到 GitHub Pages…"})
+    q.put({"event": "agent_start", "agent": "publisher", "name": AGENTS["publisher"]})
+    pub = agents["publisher"]({"generated_html": pkg.get("generated_html", ""), "selected_topic": effective_topic})
+    url = pub.get("html_url", "")
+    images = [im for im in [
+        {"url": pub.get("cover_image_url", ""), "label": "封面-起始页"},
+        {"url": pub.get("result_image_url", ""), "label": "封面-结果页"},
+        {"url": pub.get("product_image_url", ""), "label": "商品主图"},
+    ] if im["url"]]  # 截图失败(publisher 置空)时过滤
+    q.put({"event": "agent_done", "agent": "publisher",
+           "summary": {"链接": url, "图片数": len(images)}})
+    q.put({"event": "done",
+           "url": url,
+           "cost": round(token_summary()["total_cost"], 4),
+           "post_materials": {"copy": (pkg.get("packaging_text") or "").strip(), "images": images},
+           "audit_warning": audit_feedback if audit_status != "pass" else ""})
+
+
+def generate_stream(cmd: dict, ip: str, agents: dict | None = None, heartbeat_timeout: float = 15):
+    """四段链 SSE 生成器:worker 线程跑链,本生成器实时消费队列。
+
+    agents 可注入(测试用);heartbeat_timeout 为无事件时的心跳间隔(秒)。
     """
     # 真实 agent 延迟导入,避免测试环境初始化重资产
     if agents is None:
         from agents.navigator.src.main import navigator_node
         from agents.generator.src.main import generator_node
         from agents.packager.src.main import packager_node
+        from agents.reviewer.src.main import reviewer_node
+        from agents.auditor.src.main import auditor_node
         from agents.publisher.src.main import publisher_node
         agents = {
             "navigator": navigator_node,
             "generator": generator_node,
             "packager": packager_node,
+            "reviewer": reviewer_node,
+            "auditor": auditor_node,
             "publisher": publisher_node,
         }
 
-    topic = cmd["topic"]
-    count = cmd["question_count"]
-    emitter = _Emitter()
+    q = queue.Queue()
+    stop_event = threading.Event()
 
-    def drain(agent_key: str):
-        """把缓冲中的 token 事件逐帧发出并清空。"""
-        for ev in emitter.queue:
-            if ev.get("event") == "token" and ev.get("agent") == agent_key:
-                yield _sse(ev)
-        emitter.queue = []
-
-    def run_agent(fn, **state):
-        """在同一个 next() 内设置 emitter 再调用 agent(线程池逐项迭代会换 context)。"""
-        tok = set_emitter(emitter)
+    def worker():
+        # emitter 只在本线程内 set:LLM callback 与链调用同线程,contextvar 稳定可见
+        tok = set_emitter(_QueueEmitter(q))
         try:
-            return fn(state)
+            try:
+                _run_chain(q, agents, cmd, stop_event)
+            except Exception as e:
+                # 服务端日志保留完整细节;SSE 帧对外屏蔽内部异常信息
+                logger.error(f"Web console generation failed: {e}")
+                q.put({"event": "error", "message": "生成失败,请稍后再试"})
         finally:
             reset_emitter(tok)
+            q.put(_SENTINEL)
+            _running.discard(ip)
 
+    threading.Thread(target=worker, daemon=True, name=f"gen-{ip}").start()
     try:
-        _running.add(ip)
-        token_reset()
-        yield _sse({"event": "agent_start", "agent": "navigator", "name": AGENTS["navigator"]})
-        nav = run_agent(agents["navigator"], selected_topic=topic, target_question_count=count, suggested_price=1.99)
-        yield from drain("navigator")
-        yield _sse({"event": "agent_done", "agent": "navigator",
-                    "summary": {"维度数": len(nav.get("dimension_defs", [])), "定价": nav.get("suggested_price")}})
-
-        yield _sse({"event": "agent_start", "agent": "generator", "name": AGENTS["generator"]})
-        gen = run_agent(agents["generator"], selected_topic=topic, target_question_count=count,
-                        dimension_defs=nav.get("dimension_defs", []))
-        yield from drain("generator")
-        q_count = len(gen.get("questions_json", {}).get("questions", []))
-        yield _sse({"event": "agent_done", "agent": "generator", "summary": {"题目数": q_count}})
-
-        yield _sse({"event": "agent_start", "agent": "packager", "name": AGENTS["packager"]})
-        pkg = run_agent(agents["packager"], selected_topic=topic, target_question_count=count,
-                        suggested_price=1.99, dimension_defs=nav.get("dimension_defs", []),
-                        questions_json=gen.get("questions_json", {}))
-        yield from drain("packager")
-        yield _sse({"event": "agent_done", "agent": "packager", "summary": {"文案": (pkg.get("packaging_text") or "")[:60]}})
-
-        yield _sse({"event": "step", "message": "正在生成封面图并部署到 GitHub Pages…"})
-        yield _sse({"event": "agent_start", "agent": "publisher", "name": AGENTS["publisher"]})
-        pub = run_agent(agents["publisher"], generated_html=pkg.get("generated_html", ""), selected_topic=topic)
-        yield from drain("publisher")
-        url = pub.get("html_url", "")
-        yield _sse({"event": "agent_done", "agent": "publisher", "summary": {"链接": url}})
-
-        cost = token_summary()["total_cost"]
-        yield _sse({"event": "done", "url": url, "cost": round(cost, 4)})
-
-    except Exception as e:
-        # 服务端日志保留完整细节;SSE 帧对外屏蔽内部异常信息
-        logger.error(f"Web console generation failed: {e}")
-        yield _sse({"event": "error", "message": "生成失败,请稍后再试"})
+        while True:
+            try:
+                ev = q.get(timeout=heartbeat_timeout)
+            except queue.Empty:
+                yield ": ping\n\n"
+                continue
+            if ev is _SENTINEL:
+                break
+            yield _sse(ev)
+    except GeneratorExit:
+        # 客户端断开 → 通知 worker 停止(正在进行的 LLM invoke 无法中断,后续 agent 不再启动)
+        stop_event.set()
+        raise
     finally:
-        _running.discard(ip)
+        stop_event.set()
 
 
 if __name__ == "__main__":

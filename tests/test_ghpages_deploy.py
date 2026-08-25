@@ -33,3 +33,11 @@ class TestDerivePagesUrls:
 
     def test_missing_date_returns_empty(self):
         assert derive_pages_urls("https://github.com/KKKKupor/redbook_agent.git", "")["html_url"] == ""
+
+    def test_nested_time_subdirectory(self):
+        """date_str 含时间子目录 → 同一天每轮唯一 URL。"""
+        urls = derive_pages_urls("https://github.com/KKKKupor/redbook_agent.git", "2026-08-25/103000")
+        assert urls["html_url"] == "https://KKKKupor.github.io/redbook_agent/d/2026-08-25/103000/"
+        assert urls["cover_image_url"] == "https://KKKKupor.github.io/redbook_agent/d/2026-08-25/103000/cover.png"
+        assert urls["result_image_url"] == "https://KKKKupor.github.io/redbook_agent/d/2026-08-25/103000/result.png"
+        assert urls["product_image_url"] == "https://KKKKupor.github.io/redbook_agent/d/2026-08-25/103000/product.png"

@@ -5,7 +5,7 @@ import re as _re
 from langchain_core.messages import HumanMessage, SystemMessage
 from loguru import logger
 
-from utils.llm_factory import create_llm  # reviewer uses moderate temp
+from utils.llm_factory import reviewer_llm  # reviewer uses moderate temp + streaming
 from utils.review import save, save_prompt, save_response
 from utils.prompt_loader import load_skill
 from utils.token_tracker import add_from_response
@@ -98,7 +98,7 @@ def reviewer_node(state: dict) -> dict:
     Part of the Evaluator-Optimizer pattern: when score < 6, passes fixes_needed
     back to generator for targeted redo.
     """
-    llm = create_llm(temperature=0.3)  # moderate — objective but insightful
+    llm = reviewer_llm()  # moderate — objective but insightful
 
     # Track review retry count for the feedback loop
     current_retries = state.get("review_retry_count", 0)

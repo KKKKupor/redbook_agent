@@ -43,7 +43,7 @@ def publisher_node(state: dict) -> dict:
 
     logger.info("Publisher: deploying to GitHub Pages...")
     from datetime import datetime
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = datetime.now().strftime("%Y-%m-%d/%H%M%S")   # 时间子目录 → 同一天每轮唯一 URL
     try:
         from utils.ghpages_deploy import deploy_to_ghpages
         urls = deploy_to_ghpages(deploy_dir, date_str)

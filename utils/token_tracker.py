@@ -5,19 +5,29 @@ DeepSeek pricing: input ¥1.00/1M tokens, output ¥2.00/1M tokens
 (approx — adjust if actual pricing differs)
 """
 
+import threading
+
 from loguru import logger
 
 # Pricing per 1M tokens (DeepSeek)
 PRICE_INPUT_PER_1M = 3.00   # yuan
 PRICE_OUTPUT_PER_1M = 6.00  # yuan
 
-_breakdown = []  # list of {"agent": str, "input": int, "output": int, "cost": float}
+
+class _Local(threading.local):
+    """线程局部的记录表:每条 web 生成链各占一个 worker 线程,天然隔离。"""
+
+    def __init__(self):
+        self.breakdown = []
+
+
+_state = _Local()
 
 
 def add(agent: str, input_tokens: int, output_tokens: int):
     """Record token usage for one agent call."""
     cost = (input_tokens / 1_000_000) * PRICE_INPUT_PER_1M + (output_tokens / 1_000_000) * PRICE_OUTPUT_PER_1M
-    _breakdown.append({
+    _state.breakdown.append({
         "agent": agent,
         "input": input_tokens,
         "output": output_tokens,
@@ -45,12 +55,13 @@ def add_from_response(agent: str, response):
 
 
 def summary() -> dict:
-    """Return cost summary."""
-    total_input = sum(b["input"] for b in _breakdown)
-    total_output = sum(b["output"] for b in _breakdown)
-    total_cost = sum(b["cost"] for b in _breakdown)
+    """Return cost summary for the current thread."""
+    breakdown = _state.breakdown
+    total_input = sum(b["input"] for b in breakdown)
+    total_output = sum(b["output"] for b in breakdown)
+    total_cost = sum(b["cost"] for b in breakdown)
     return {
-        "breakdown": _breakdown,
+        "breakdown": breakdown,
         "total_input": total_input,
         "total_output": total_output,
         "total_tokens": total_input + total_output,
@@ -59,4 +70,5 @@ def summary() -> dict:
 
 
 def reset():
-    _breakdown.clear()
+    """Clear records for the current thread only."""
+    _state.breakdown = []

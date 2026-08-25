@@ -30,7 +30,7 @@ def deploy_vercel(html: str) -> str:
     (deploy_dir / "index.html").write_text(html, encoding="utf-8")
     try:
         from utils.ghpages_deploy import deploy_to_ghpages
-        urls = deploy_to_ghpages(deploy_dir, datetime.now().strftime("%Y-%m-%d"))
+        urls = deploy_to_ghpages(deploy_dir, datetime.now().strftime("%Y-%m-%d/%H%M%S"))
         return urls["html_url"]
     except Exception as e:
         logger.error(f"Deploy failed: {e}")

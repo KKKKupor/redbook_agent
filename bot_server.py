@@ -51,6 +51,7 @@ async def generate_test(topic: str, question_count: int) -> dict:
     # 1. Navigator
     state = {"selected_topic": topic, "target_question_count": question_count, "suggested_price": 1.99}
     nav = navigator_node(state)
+    topic = nav.get("selected_topic") or topic   # 空选题时回传 navigator 的池选题
 
     # 2. Generator
     gen = generator_node({"selected_topic": topic, "target_question_count": question_count, "dimension_defs": nav.get("dimension_defs", [])})

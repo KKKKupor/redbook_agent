@@ -71,6 +71,11 @@ def packager_llm() -> ChatOpenAI:
     """包装: moderate-high, creative copywriting."""
     return create_llm(temperature=0.7, max_tokens=8192, agent_key="packager")
 
+def reviewer_llm() -> ChatOpenAI:
+    """质量评审: moderate temperature, structured scoring."""
+    return create_llm(temperature=0.3, agent_key="reviewer")
+
+
 def auditor_llm() -> ChatOpenAI:
     """审核: very low temperature, strict and consistent."""
     return create_llm(temperature=0.1, agent_key="auditor")

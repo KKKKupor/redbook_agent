@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>小红书 Agent 工作台</title>
+<title>小红书测试题生成台</title>
 <style>
 :root {
   /* Claude design tokens (claude/DESIGN.md) */
@@ -181,7 +181,6 @@ body {
   border-radius: var(--radius-card);
   overflow: hidden;
 }
-.agent-card.waiting { opacity: 0.85; }
 
 .agent-head {
   display: flex;
@@ -306,6 +305,89 @@ body {
   color: var(--error);
   word-break: break-word;
 }
+.warn-banner {
+  background: rgba(232, 165, 90, 0.08);
+  border: 1px solid rgba(232, 165, 90, 0.4);
+  border-radius: var(--radius-btn);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #8a5a1e;
+  word-break: break-word;
+}
+
+/* ---- post materials (发帖素材:文案 + 截图, cream 卡) ---- */
+.post-materials {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pm-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+}
+.pm-copy { position: relative; }
+.pm-copy pre {
+  margin: 0;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  padding: 12px 14px;
+  padding-right: 96px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--body);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.pm-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-btn);
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--body);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: color 150ms ease-out, border-color 150ms ease-out;
+}
+.pm-copy-btn:hover { color: var(--primary-active); border-color: var(--primary); }
+.pm-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.pm-figure { margin: 0; }
+.pm-figure img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--hairline);
+  display: block;
+}
+.pm-figure figcaption {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.pm-figure.pm-figure-failed img { display: none; }
+.pm-figure.pm-figure-failed figcaption::after {
+  content: "(加载失败)";
+  display: block;
+  color: var(--error);
+}
+.pm-hint { font-size: 12px; color: var(--muted); }
 
 .result-row {
   display: flex;
@@ -446,7 +528,7 @@ body {
 <body>
 
 <header class="brand">
-  <div class="brand-title">小红书 Agent 工作台</div>
+  <div class="brand-title">小红书测试题生成台</div>
   <div class="brand-status">
     <span class="status-dot" id="statusDot"></span>
     <span class="status-text" id="statusText">就绪</span>
@@ -490,6 +572,8 @@ body {
     { key: "navigator", label: "领航员 Navigator" },
     { key: "generator", label: "生成器 Generator" },
     { key: "packager", label: "包装师 Packager" },
+    { key: "reviewer", label: "评审员 Reviewer" },
+    { key: "auditor", label: "审核员 Auditor" },
     { key: "publisher", label: "发布器 Publisher" }
   ];
 
@@ -570,49 +654,60 @@ body {
   function renderRound() {
     var round = document.createElement("div");
     round.className = "round";
+    thread.appendChild(round);
     cards = {};
     lastCard = null;
     startedAt = {};
-    AGENTS.forEach(function (a) {
-      var card = document.createElement("div");
-      card.className = "agent-card waiting";
-      card.dataset.agent = a.key;
+  }
 
-      var head = document.createElement("div");
-      head.className = "agent-head";
-      var light = document.createElement("span");
-      light.className = "status-light";
-      var name = document.createElement("span");
-      name.className = "agent-name";
-      name.textContent = a.label;
-      var elapsed = document.createElement("span");
-      elapsed.className = "agent-elapsed";
-      elapsed.textContent = "—";
-      head.appendChild(light);
-      head.appendChild(name);
-      head.appendChild(elapsed);
+  // 卡片按需创建:agent_start 事件到达(该 agent 开始思考)时才出现
+  function createCard(agent) {
+    var a = null;
+    for (var i = 0; i < AGENTS.length; i++) {
+      if (AGENTS[i].key === agent) { a = AGENTS[i]; break; }
+    }
+    if (!a) return null;
 
-      var stream = document.createElement("div");
-      stream.className = "agent-stream";
-      var textNode = document.createTextNode("");
-      stream.appendChild(textNode);
+    var card = document.createElement("div");
+    card.className = "agent-card";
+    card.dataset.agent = a.key;
 
-      var details = document.createElement("details");
-      details.className = "summary";
-      var sum = document.createElement("summary");
-      sum.textContent = "结果摘要";
-      var pre = document.createElement("pre");
-      details.appendChild(sum);
-      details.appendChild(pre);
+    var head = document.createElement("div");
+    head.className = "agent-head";
+    var light = document.createElement("span");
+    light.className = "status-light";
+    var name = document.createElement("span");
+    name.className = "agent-name";
+    name.textContent = a.label;
+    var elapsed = document.createElement("span");
+    elapsed.className = "agent-elapsed";
+    elapsed.textContent = "—";
+    head.appendChild(light);
+    head.appendChild(name);
+    head.appendChild(elapsed);
 
-      card.appendChild(head);
-      card.appendChild(stream);
-      card.appendChild(details);
-      round.appendChild(card);
+    var stream = document.createElement("div");
+    stream.className = "agent-stream";
+    var textNode = document.createTextNode("");
+    stream.appendChild(textNode);
 
-      cards[a.key] = { card: card, stream: stream, textNode: textNode, caret: null, details: details, pre: pre, elapsed: elapsed };
-    });
-    thread.appendChild(round);
+    var details = document.createElement("details");
+    details.className = "summary";
+    var sum = document.createElement("summary");
+    sum.textContent = "结果摘要";
+    var pre = document.createElement("pre");
+    details.appendChild(sum);
+    details.appendChild(pre);
+
+    card.appendChild(head);
+    card.appendChild(stream);
+    card.appendChild(details);
+
+    var round = thread.querySelector(".round:last-child");
+    if (round) round.appendChild(card); else thread.appendChild(card);
+
+    cards[a.key] = { card: card, stream: stream, textNode: textNode, caret: null, details: details, pre: pre, elapsed: elapsed };
+    return cards[a.key];
   }
 
   /* ---------- agent lifecycle ---------- */
@@ -639,7 +734,6 @@ body {
     var c = cards[agent];
     if (!c) return;
     lastCard = c.card;
-    c.card.classList.remove("waiting");
     c.card.classList.add("running");
     c.card.classList.add("has-stream");
     startedAt[agent] = Date.now();
@@ -734,9 +828,111 @@ body {
     return "";
   }
 
-  function finishRound(url, cost) {
+  function copyText(text) {
+    function ok() { showToast("已复制文案"); }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(ok, function () { fallbackCopy(text, ok); });
+    } else {
+      fallbackCopy(text, ok);
+    }
+  }
+
+  function fallbackCopy(text, ok) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); ok(); } catch (e) { /* 复制失败,静默 */ }
+    ta.remove();
+  }
+
+  function renderMaterials(m) {
+    var box = document.createElement("div");
+    box.className = "post-materials";
+    var title = document.createElement("div");
+    title.className = "pm-title";
+    title.textContent = "发帖素材";
+    box.appendChild(title);
+
+    if (m.copy) {
+      var copyWrap = document.createElement("div");
+      copyWrap.className = "pm-copy";
+      var pre = document.createElement("pre");
+      pre.textContent = m.copy;
+      copyWrap.appendChild(pre);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pm-copy-btn";
+      btn.textContent = "复制文案";
+      btn.addEventListener("click", function () { copyText(m.copy); });
+      copyWrap.appendChild(btn);
+      box.appendChild(copyWrap);
+    }
+
+    var imgs = m.images || [];
+    if (imgs.length) {
+      var grid = document.createElement("div");
+      grid.className = "pm-images";
+      imgs.forEach(function (im) {
+        var fig = document.createElement("figure");
+        fig.className = "pm-figure";
+        var img = document.createElement("img");
+        img.src = safeUrl(im.url);
+        img.alt = im.label || "截图";
+        img.loading = "lazy";
+        img.addEventListener("error", function () {
+          fig.classList.add("pm-figure-failed");
+        });
+        var cap = document.createElement("figcaption");
+        cap.textContent = im.label || "";
+        fig.appendChild(img);
+        fig.appendChild(cap);
+        grid.appendChild(fig);
+      });
+      box.appendChild(grid);
+      var hint = document.createElement("div");
+      hint.className = "pm-hint";
+      hint.textContent = "刚部署完成,若链接或图片打不开,请稍候几分钟再试";
+      box.appendChild(hint);
+    }
+
+    thread.appendChild(box);
+    autoScroll();
+  }
+
+  function finishRound(url, cost, rejected, reply, postMaterials, auditWarning) {
     stopped = true;
     url = safeUrl(url);   // 只允许 http/https,否则走无链接分支
+    if (rejected) {
+      // navigator 拒绝(题量超限/无关输入):不显示链接,展示拒绝说明
+      var rowR = document.createElement("div");
+      rowR.className = "result-row";
+      var labelR = document.createElement("span");
+      labelR.className = "result-label";
+      labelR.textContent = "本轮未生成测试题";
+      rowR.appendChild(labelR);
+      var why = document.createElement("span");
+      why.textContent = reply || "";
+      why.style.wordBreak = "break-word";
+      rowR.appendChild(why);
+      thread.appendChild(rowR);
+      setBusy(false);
+      autoScroll();
+      return;
+    }
+    // ① 发帖素材层:文案(可复制)+ 截图预览
+    if (postMaterials && (postMaterials.copy || (postMaterials.images && postMaterials.images.length))) {
+      renderMaterials(postMaterials);
+    }
+    // 审核未通过警示(已放行)
+    if (auditWarning) {
+      var warn = document.createElement("div");
+      warn.className = "warn-banner";
+      warn.textContent = "审核提示:" + auditWarning;
+      thread.appendChild(warn);
+    }
+    // ② 测试题跳转层
     var row = document.createElement("div");
     row.className = "result-row";
     var label = document.createElement("span");
@@ -779,11 +975,14 @@ body {
       var ev;
       try { ev = JSON.parse(payload); } catch (e) { continue; }
       switch (ev.event) {
-        case "agent_start": activate(ev.agent); break;
+        case "agent_start":
+          // 重做轮同名 agent 再次 start:新建卡片,旧卡保持 done(每轮可见)
+          if (createCard(ev.agent)) activate(ev.agent);
+          break;
         case "token": appendToken(ev.agent, ev.text); break;
         case "agent_done": finish(ev.agent, ev.summary); break;
         case "step": addStep(ev.message); break;
-        case "done": finishRound(ev.url, ev.cost); return true;
+        case "done": finishRound(ev.url, ev.cost, ev.rejected, ev.reply, ev.post_materials, ev.audit_warning); return true;
         case "error": midStreamError(ev.message); return true;
       }
     }

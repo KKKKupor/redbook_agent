@@ -22,6 +22,14 @@
 | `time_series_forecast` | ✅ | 发布时间预测(mock) |
 | `get_topic_diversity` | ✅ | 题材分布 |
 
+## 2026-08-25 变更
+- **Web 入口校验(仅网页生效)**: `state.user_message` 非空(web 控制台传用户原话;钉钉/日常调度不传,天然不受影响)时启用两条拒绝路径:
+  - **题量超限**: 请求 > `MAX_QUESTIONS`(60题)→ LLM 生成拒绝文案(附用户原话+上限+token估算,流式可见),返回 `{"rejected": true, "reply": ...}`,零副作用(不查工具、不写选题历史);LLM 失败用模板兜底,拒绝结论不变。token 估算系数 `TOKENS_PER_QUESTION = 325`(实测 15题≈4871 out tokens),仅作文案素材
+  - **无关输入**: 决策 context 追加判定段(不改 system.md,避免日常调度 schema drift),LLM 判定输入非测试题请求 → `{"rejected": true, "reply": "能力边界说明"}` → 早退
+- **拒绝文案提示词**: 新 skill `src/skills/refusal.md`(`load_skill(__file__, "refusal")`)
+- web 控制台收到 rejected 后直接终止链(不调 generator/packager/publisher),前端显示"本轮未生成测试题"+拒绝说明
+- 测试 `tests/test_navigator_rejection.py`(5条)
+
 ## 2026-08-24 变更
 - **用户选题优先**: `state.selected_topic` 非空(web控制台/钉钉/quick_test 传入)时直接采用,策略标记 `user`,不写入 generated 历史
 - **池选题不重复**: 无用户选题时从 `data/topic_pool.json` 70/30 轮转,已生成过的选题写入 `data/generated_topics.json`(跨运行持久化,data/ 不提交 Git);池耗尽自动重置历史重新循环并记录 health note `pool_cycle_reset`
@@ -50,7 +58,7 @@
 不需要手动脚本。`bot_server.py` 中 `generate_test()` 函数已内置自动调 Publisher。
 DingTalk outgoing webhook 恢复后即可使用：`python bot_server.py` + `ngrok http 8080`。
 
-Web 控制台: `python web_console.py` → http://localhost:8090/ 发指令即可流式生成(每IP每日1次)
+Web 控制台: `python web_console.py` → http://localhost:8090/ 发指令即可流式生成(每IP每日1次;回环IP与 env `WHITELIST_IPS` 白名单不限次;单次上限60题,超限/无关输入由 navigator 拒绝)
 
 ## 已知局限
 - 搜索在中国网络下fallback到训练数据（DuckDuckGo被墙），非实时信息

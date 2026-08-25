@@ -1,0 +1,26 @@
+# External reference projects (not part of the product)
+garden-skills/
+github_example/
+xiaohongshu-ai-workbench-main/
+claude/
+
+# Runtime data
+data/
+output/
+logs/
+
+# Secrets / env
+.env
+.env.local
+
+# Working state
+.temp_fix/
+.superpowers/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+
+# VCS / IDE
+.git/
+.idea/
+.vscode/

@@ -22,14 +22,23 @@ def parse_command(text: str) -> dict:
         return {"type": "approve_publish", "text": text}
 
     # Generate command
-    # 前缀剥离(做/要/想要/关于 + 一个/个/一款),题量尾巴单独去掉,保留话题里的"测试"字样
-    topic_match = re.search(r'(?:关于|做|想要|要)(?:一个|个|一款)?(.+)', text)
+    # 前缀剥离(做/要/想要/关于/生成 + 一个/个/一款),题量尾巴单独去掉,保留话题里的"测试"字样
+    # 题量尾巴兼容量词:"1000题" / "1000道题" / "1000道测试题"
+    topic_match = re.search(r'(?:关于|做|想要|要|生成)(?:一个|个|一款)?(.+)', text)
     if topic_match:
-        topic = re.sub(r'[，,。\s]*\d+\s*题.*$', '', topic_match.group(1)).strip()
-        if not topic:
-            topic = text[:30]
+        topic = re.sub(r'[，,。\s]*\d+\s*[道个]?\s*(?:测试)?题.*$', '', topic_match.group(1)).strip()
     else:
         topic = text[:30]
-    count_match = re.search(r'(\d+)\s*题', text)
+    if re.fullmatch(r'\d+\s*[道个]?', topic):
+        # 纯题量残留("做15道")→ 空选题
+        topic = ""
+    if len(topic) <= 2:
+        # 剥离后无实质主题(如"帮我生成一个10道测试题")→ 空选题,由 navigator 走选题池
+        topic = ""
+    count_match = re.search(r'(\d+)\s*[道个]?\s*(?:测试)?题', text)
+    if count_match is None:
+        # 仅有量词无"题"字:"做15道"
+        count_match = re.search(r'(\d+)\s*[道个]\s*$', text)
     count = int(count_match.group(1)) if count_match else 15
-    return {"type": "generate", "text": text, "topic": topic, "question_count": min(count, 100)}
+    # 不做静默截断:题量校验交给 navigator 的拒绝逻辑(web 场景上限 60 题)
+    return {"type": "generate", "text": text, "topic": topic, "question_count": count}
