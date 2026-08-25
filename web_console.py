@@ -10,6 +10,7 @@ SSE 生成器实时消费队列,保证 token 逐帧到达前端(而非 agent 完
 import json
 import os
 import queue
+import re
 import sys
 import threading
 from pathlib import Path
@@ -17,6 +18,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 import uvicorn
 
@@ -31,6 +33,10 @@ from utils.token_tracker import summary as token_summary
 
 app = FastAPI()
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "web_console.html"
+# 静态托管生成的测试页与封面图(/quiz/...)— 素材图本地加载,不依赖 github.io 可达性
+DEPLOY_DIR = Path(__file__).resolve().parent / "output" / "deploy"
+DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/quiz", StaticFiles(directory=str(DEPLOY_DIR)), name="quiz")
 # 白名单 = 回环(本机测试)∪ env 配置;白名单 IP 不限次、不消耗配额
 LIMIT = DailyLimit(
     Path(__file__).resolve().parent / "data" / "rate_limit.json",
@@ -64,6 +70,14 @@ class _QueueEmitter:
 
 def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+def _local_quiz_url(url: str) -> str:
+    """gh-pages 素材 URL → 本服务静态路径 /quiz/d/...(本地加载,不依赖 github.io)。"""
+    if not url:
+        return ""
+    m = re.search(r"/d/(.*)", url)
+    return "/quiz/d/" + m.group(1) if m else url
 
 
 def _client_ip(request: Request) -> str:
@@ -214,9 +228,9 @@ def _run_chain(q: queue.Queue, agents: dict, cmd: dict, stop_event: threading.Ev
     pub = agents["publisher"]({"generated_html": pkg.get("generated_html", ""), "selected_topic": effective_topic})
     url = pub.get("html_url", "")
     images = [im for im in [
-        {"url": pub.get("cover_image_url", ""), "label": "封面-起始页"},
-        {"url": pub.get("result_image_url", ""), "label": "封面-结果页"},
-        {"url": pub.get("product_image_url", ""), "label": "商品主图"},
+        {"url": _local_quiz_url(pub.get("cover_image_url", "")), "label": "封面-起始页"},
+        {"url": _local_quiz_url(pub.get("result_image_url", "")), "label": "封面-结果页"},
+        {"url": _local_quiz_url(pub.get("product_image_url", "")), "label": "商品主图"},
     ] if im["url"]]  # 截图失败(publisher 置空)时过滤
     q.put({"event": "agent_done", "agent": "publisher",
            "summary": {"链接": url, "图片数": len(images)}})

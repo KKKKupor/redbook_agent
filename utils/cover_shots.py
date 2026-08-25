@@ -47,14 +47,17 @@ def capture_cover_images(html_path: Path, out_dir: Path) -> dict:
             context = browser.new_context(viewport=VIEWPORT_COVER, locale="zh-CN")
             page = context.new_page()
 
-            # 1) 起始页封面(3:4)—— wait_until="commit" 避免被 Chart.js CDN 拖慢
-            page.goto(html_uri, wait_until="commit", timeout=30000)
-            # 确定性首帧信号:等待 #landing 的 fadeSlideIn(0.5s)动画完成,
-            # 替代固定延时/visible 信号(二者都会在动画中途截图,得到半透明残影)
+            # 1) 起始页封面(3:4)
+            # 等待明确化(替代原 wait_until="commit"):domcontentloaded(阻塞脚本已返回或失败)
+            # → 应用脚本就绪 → 动画完成 → 双 rAF(确保至少合成一帧再截图)
+            page.goto(html_uri, wait_until="domcontentloaded", timeout=30000)
+            # CDN 完全挂起时应用脚本不执行 → 此处 30s 超时抛异常,由调用方降级(全有或全无)
+            page.wait_for_function("typeof startTest === 'function'", timeout=30000)
             page.wait_for_function(
                 "getComputedStyle(document.getElementById('landing')).opacity === '1'",
                 timeout=5000,
             )
+            page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
             page.screenshot(path=str(out_dir / "cover.png"))
 
             # 2) 答题到结果页,截雷达图(3:4)
@@ -75,10 +78,15 @@ def capture_cover_images(html_path: Path, out_dir: Path) -> dict:
             page.wait_for_timeout(300)
             page.screenshot(path=str(out_dir / "result.png"))
 
-            # 3) 商品主图(1:1)—— 重新以方形视口加载起始页
+            # 3) 商品主图(1:1)—— 重新以方形视口加载起始页(与 cover 相同的等待,替代固定 800ms)
             page.set_viewport_size(VIEWPORT_PRODUCT)
-            page.goto(html_uri, wait_until="commit", timeout=30000)
-            page.wait_for_timeout(800)
+            page.goto(html_uri, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_function("typeof startTest === 'function'", timeout=30000)
+            page.wait_for_function(
+                "getComputedStyle(document.getElementById('landing')).opacity === '1'",
+                timeout=5000,
+            )
+            page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
             page.screenshot(path=str(out_dir / "product.png"))
         finally:
             browser.close()

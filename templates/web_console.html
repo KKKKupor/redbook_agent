@@ -880,7 +880,6 @@ body {
         var img = document.createElement("img");
         img.src = safeUrl(im.url);
         img.alt = im.label || "截图";
-        img.loading = "lazy";
         img.addEventListener("error", function () {
           fig.classList.add("pm-figure-failed");
         });

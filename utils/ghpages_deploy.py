@@ -66,6 +66,34 @@ def _git_config(key: str) -> str:
         return ""
 
 
+def derive_static_urls(base_url: str, date_str: str) -> dict:
+    """static 模式 URL:自托管静态目录 {PUBLIC_BASE_URL}/quiz/d/{date_str}/。base 或 date 缺失返回全空串。"""
+    base = (base_url or "").rstrip("/")
+    if not base or not date_str:
+        return dict(_EMPTY_URLS)
+    day = f"{base}/quiz/d/{date_str}"
+    return {
+        "html_url": day + "/",
+        "cover_image_url": f"{day}/cover.png",
+        "result_image_url": f"{day}/result.png",
+        "product_image_url": f"{day}/product.png",
+    }
+
+
+def _stage_local_copy(deploy_dir: Path, date_str: str) -> Path:
+    """把 deploy_dir 内容复制到本地静态托管目录 output/deploy/d/{date_str}/(纯文件操作)。
+
+    供 /quiz 静态路由使用(素材图本地加载,不依赖 github.io 可达性)。
+    """
+    day = REPO_ROOT / "output" / "deploy" / "d" / date_str
+    day.mkdir(parents=True, exist_ok=True)
+    for name in ("index.html", "cover.png", "result.png", "product.png"):
+        src = deploy_dir / name
+        if src.exists():
+            shutil.copy(src, day / name)
+    return day
+
+
 def deploy_to_ghpages(deploy_dir: Path, date_str: str) -> dict:
     """部署 deploy_dir(HTML+截图)到 gh-pages:根=最新版,d/{date}=当天永久版。
 
@@ -75,6 +103,9 @@ def deploy_to_ghpages(deploy_dir: Path, date_str: str) -> dict:
     index = deploy_dir / "index.html"
     if not index.exists():
         raise FileNotFoundError(f"{index} 不存在,无法部署")
+
+    # 先留本地副本(静态托管用),git 推送失败时本地 URL 仍可用
+    _stage_local_copy(deploy_dir, date_str)
 
     origin = _git_config("remote.origin.url") or _git(REPO_ROOT, "remote", "get-url", "origin")
     if not origin:

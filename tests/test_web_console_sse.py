@@ -6,7 +6,7 @@
 import threading
 import time
 
-from web_console import generate_stream
+from web_console import generate_stream, _local_quiz_url
 
 
 def _frames(gen) -> list:
@@ -302,6 +302,17 @@ class TestReviewLoop:
         assert events[-1]["event"] == "done"
 
 
+class TestLocalQuizUrl:
+    def test_ghpages_url_maps_to_local_static(self):
+        """素材 URL 从 github.io 映射为本服务 /quiz/ 静态路径(本地加载)。"""
+        assert _local_quiz_url("https://KKKKupor.github.io/redbook_agent/d/2026-08-25/121436/cover.png") \
+            == "/quiz/d/2026-08-25/121436/cover.png"
+
+    def test_empty_and_unmappable_passthrough(self):
+        assert _local_quiz_url("") == ""
+        assert _local_quiz_url("C:/some/local/path.png") == "C:/some/local/path.png"
+
+
 class TestAuditorAndMaterials:
     def test_auditor_fail_publishes_anyway_with_warning(self):
         """审核 fail 不回退(web 交互场景),done 帧带 audit_warning。"""
@@ -323,6 +334,18 @@ class TestAuditorAndMaterials:
         events = _frames(generate_stream({"type": "generate", "topic": "测试", "question_count": 5},
                                          "test-ip", agents=agents))
         assert events[-1]["post_materials"]["images"] == []
+
+    def test_post_materials_images_use_local_quiz_urls(self):
+        """素材图 URL 映射为 /quiz/ 本地路径(不依赖 github.io 可达性)。"""
+        agents = _fake_agents()
+        events = _frames(generate_stream({"type": "generate", "topic": "测试", "question_count": 5},
+                                         "test-ip", agents=agents))
+        urls = [im["url"] for im in events[-1]["post_materials"]["images"]]
+        assert urls == [
+            "/quiz/d/2026-08-25/103000/cover.png",
+            "/quiz/d/2026-08-25/103000/result.png",
+            "/quiz/d/2026-08-25/103000/product.png",
+        ]
 
     def test_reviewer_auditor_summaries_in_frames(self):
         """reviewer/auditor 的 agent_done 帧带评分与审核摘要。"""
